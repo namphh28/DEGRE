@@ -1,0 +1,11 @@
+baselines_to_run = [
+    {'config_name': 'A.1 - Ensemble + MCDO', 'mcdo_enable': True, 'calibration_method': None, 'ood_detection_method': None, 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'A.2.1 - Ensemble + Isotonic Regression', 'mcdo_enable': False, 'calibration_method': 'isotonic', 'ood_detection_method': None, 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'A.2.2 - Ensemble + Beta Calibration', 'mcdo_enable': False, 'calibration_method': 'beta', 'ood_detection_method': None, 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'A.2.3 - Ensemble + Label Smoothing', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': None, 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'B.1.1 - Ensemble + ODIN (Basic)', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': 'odin_basic', 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'B.1.2 - Ensemble + ODIN (Combined)', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': 'odin_combined', 'combine_ood_with_disagreement': True, 'enable_training_dynamics': False},
+    {'config_name': 'B.2.1 - Ensemble + Energy Score (Basic)', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': 'energy_basic', 'combine_ood_with_disagreement': False, 'enable_training_dynamics': False},
+    {'config_name': 'B.2.2 - Ensemble + Energy Score (Combined)', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': 'energy_combined', 'combine_ood_with_disagreement': True, 'enable_training_dynamics': False},
+    {'config_name': 'B.3 - Ensemble + Training Dynamics Insights', 'mcdo_enable': False, 'calibration_method': None, 'ood_detection_method': None, 'combine_ood_with_disagreement': False, 'enable_training_dynamics': True},
+]
