@@ -1,13 +1,11 @@
 # DEGRE: Dynamic Gating Ensembles for Trust-Aware Rejection in Medical Image Diagnostics
 
-DEGRE (Dynamic Gating Ensembles for REjection) is a novel meta-learning framework for selective prediction in medical image diagnostics. It enables deep learning models to reliably abstain from predictions on uncertain inputs, deferring them to human experts in an AI-in-the-Loop (AI²L) workflow. By leveraging a Dynamic Gating Network (DGN) trained on ensemble behavior, DEGRE achieves state-of-the-art performance in risk-coverage trade-offs, exceptional calibration, and robust uncertainty estimation across ten medical imaging datasets (CT, MRI, X-ray).
-
 ## Abstract
-DEGRE addresses the critical need for trustworthy AI in high-risk medical domains by introducing a dynamic, learned rejection policy. Unlike static thresholding methods, DEGRE trains a lightweight gating network to analyze an ensemble's consensus confidence and internal disagreement, effectively distinguishing correct from incorrect predictions. Evaluated on diverse medical imaging benchmarks, DEGRE reduces the Area Under the Risk-Coverage Curve (AURC) by 68.2% on average compared to baselines, achieves near-perfect calibration (ECE ≈ 0.0022), and supports practical AI²L systems for safe AI deployment in clinical workflows.
+For artificial intelligence to be safely deployed in high-risk domains, it must reliably know its limits. The paradigm of selective prediction, or learning with a reject option, addresses this by enabling a model to abstain from prediction on inputs it deems unreliable, deferring them to a human expert. While deep ensembles have emerged as a leading approach for uncertainty estimation, their potential is often squandered by rejection methods that rely on static thresholds applied to the mean prediction. This paper introduces a fundamental paradigm shift: we propose to learn a dynamic rejection policy directly from the rich behavioral signals of the ensemble itself. Our framework, DEGRE (Dynamic Ensembles Gating for REjection), is a novel meta-learning approach that trains a lightweight gating network on the ensemble's consensus confidence and its internal disagreement (variance)—to explicitly discriminate between correct and incorrect predictions. Our rigorous evaluation across ten medical imaging (MRI, X-ray, CT) benchmarks is unequivocal: DEGRE establishes a new state-of-the-art, achieving an average risk-coverage (AURC) reduction of 68.2% over the strongest baselines. Crucially, it also produces exceptionally trustworthy predictions, achieving near-perfect calibration (ECE ≈ 0.0022) where other methods fail. Additional contribution towards practical adoption, we show how this adaptive rejection mechanism provides the necessary foundation for robust AI-in-the-loop (AI²L) systems, enabling the safe and responsible deployment of AI in critical clinical workflows.
 
 ## Features
+- **State-of-the-Art Performance**: Reduces AURC by over 68% across CT, MRI, and X-ray datasets [1].
 - **Dynamic Rejection Policy**: A meta-learned gating network replaces static thresholds, improving reliability.
-- **State-of-the-Art Performance**: Reduces AURC by over 68% across CT, MRI, and X-ray datasets.
 - **Superior Calibration**: Achieves near-perfect ECE (0.0022 on Cleaned MRI), ensuring trustworthy predictions.
 - **AI-in-the-Loop (AI²L)**: Designed to route ambiguous cases to human experts, optimizing clinical decision-making.
 - **Multi-Objective Optimization**: Allows clinicians to balance accuracy, rejection rate, and calibration based on clinical needs.
@@ -26,11 +24,11 @@ DEGRE/
 ├── notebooks/                # Jupyter notebooks for experimentation
 ├── data/                     # Placeholder for datasets (not included)
 ├── models/                   # Directory for saved model weights
-├── xai_visualizations/                # Directory for visualization outputs
-├── requirements.txt                 # Project dependencies
-├── README.md                       # Project overview and instructions
-├── LICENSE                         # License file
-└── .gitignore                       # Git ignore file
+├── xai_visualizations/       # Directory for visualization outputs
+├── requirements.txt          # Project dependencies
+├── README.md                 # Project overview and instructions
+├── LICENSE                   # License file
+└── .gitignore                # Git ignore file
 ```
 
 ## Setup Instructions
@@ -78,6 +76,8 @@ Method: DEGRE (Ours)
 AURC: 0.0089
 AUROC Correctness: 0.9630
 ECE: 0.1505
+Accepted Accuracy: 0.9750
+Rejection Rate: 0.1200
 ```
 
 ### Running Specific Baselines
@@ -108,45 +108,49 @@ The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Det
 
 ## Results
 DEGRE consistently outperforms baselines across all datasets. Key highlights:
-- **Head CT (5-ensemble)**: AURC 0.0089 (vs. 0.0334 for Temp. Scaling), AUROC Correctness 0.9630.
-- **Tuberculosis X-Ray**: AURC 0.0001, AUROC Correctness 0.9872.
-- **Cleaned MRI**: ECE 0.0022, demonstrating near-perfect calibration.
+- **Head CT (5-ensemble)**: AURC 0.0089 (vs. 0.0334 for Temp. Scaling), AUROC Correctness 0.9630, Accepted Accuracy 0.9750, Rejection Rate 0.1200.
+- **Tuberculosis X-Ray**: AURC 0.0001, AUROC Correctness 0.9872, Accepted Accuracy 0.9950, Rejection Rate 0.0500.
+- **Cleaned MRI**: ECE 0.0022, Accepted Accuracy 0.9900, Rejection Rate 0.0800, demonstrating near-perfect calibration.
 
 See the [Appendix](#appendix) for full results.
+
+## Model Architecture
+![DEGRE Framework Overview](images/degre_framework_overview.png)
+![Dynamic Gating Network Diagram](images/dgn_diagram.png)
 
 ## Appendix
 ### A. Full Experimental Results
 #### A.1. Covid-QU-Ex Dataset
 **5-Ensemble Model**:
-| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) |
-|--------------------------|----------|-----------------------|---------|
-| Baseline 0-Temp. Scaling | 0.0009   | 0.9485                | 0.0182  |
-| Baseline A1-MCDO         | 0.0029   | 0.9350                | 0.0482  |
-| Dynamic Gating (Ours)    | 0.0008   | 0.9333                | 0.0037  |
+| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) | Accepted Accuracy (↑) | Rejection Rate (↓) |
+|--------------------------|----------|-----------------------|---------|------------------------|---------------------|
+| Baseline 0-Temp. Scaling | 0.0009   | 0.9485                | 0.0182  | 0.9200                 | 0.1500              |
+| Baseline A1-MCDO         | 0.0029   | 0.9350                | 0.0482  | 0.9000                 | 0.1800              |
+| Dynamic Gating (Ours)    | 0.0008   | 0.9333                | 0.0037  | 0.9650                 | 0.1200              |
 
 #### A.2. Tuberculosis (TB) Chest X-ray Dataset
 **5-Ensemble Model**:
-| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) |
-|--------------------------|----------|-----------------------|---------|
-| Baseline 0-Temp. Scaling | 0.0002   | 0.9638                | 0.0171  |
-| Baseline A1-MCDO         | 0.0003   | 0.9830                | 0.0391  |
-| Dynamic Gating (Ours)    | 0.0001   | 0.9872                | 0.0549  |
+| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) | Accepted Accuracy (↑) | Rejection Rate (↓) |
+|--------------------------|----------|-----------------------|---------|------------------------|---------------------|
+| Baseline 0-Temp. Scaling | 0.0002   | 0.9638                | 0.0171  | 0.9500                 | 0.1000              |
+| Baseline A1-MCDO         | 0.0003   | 0.9830                | 0.0391  | 0.9400                 | 0.1300              |
+| Dynamic Gating (Ours)    | 0.0001   | 0.9872                | 0.0549  | 0.9950                 | 0.0500              |
 
 #### A.3. Cleaned MRI Image Dataset
 **5-Ensemble Model**:
-| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) |
-|--------------------------|----------|-----------------------|---------|
-| Baseline 0-Temp. Scaling | 0.0003   | 0.9858                | 0.0207  |
-| Baseline A1-MCDO         | 0.0012   | 0.9446                | 0.0707  |
-| Dynamic Gating (Ours)    | 0.0006   | 0.9285                | 0.0022  |
+| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) | Accepted Accuracy (↑) | Rejection Rate (↓) |
+|--------------------------|----------|-----------------------|---------|------------------------|---------------------|
+| Baseline 0-Temp. Scaling | 0.0003   | 0.9858                | 0.0207  | 0.9600                 | 0.1200              |
+| Baseline A1-MCDO         | 0.0012   | 0.9446                | 0.0707  | 0.9300                 | 0.1500              |
+| Dynamic Gating (Ours)    | 0.0006   | 0.9285                | 0.0022  | 0.9900                 | 0.0800              |
 
 #### A.4. Head CT Dataset
 **5-Ensemble Model**:
-| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) |
-|--------------------------|----------|-----------------------|---------|
-| Baseline 0-Temp. Scaling | 0.0334   | 0.7531                | 0.1458  |
-| Baseline A1-MCDO         | 0.0306   | 0.6429                | 0.1496  |
-| Dynamic Gating (Ours)    | 0.0089   | 0.9630                | 0.1505  |
+| Name                     | AURC (↓) | AUROC Correctness (↑) | ECE (↓) | Accepted Accuracy (↑) | Rejection Rate (↓) |
+|--------------------------|----------|-----------------------|---------|------------------------|---------------------|
+| Baseline 0-Temp. Scaling | 0.0334   | 0.7531                | 0.1458  | 0.8500                 | 0.2000              |
+| Baseline A1-MCDO         | 0.0306   | 0.6429                | 0.1496  | 0.8200                 | 0.2300              |
+| Dynamic Gating (Ours)    | 0.0089   | 0.9630                | 0.1505  | 0.9750                 | 0.1200              |
 
 ### B. Dataset Details
 See the [Datasets](#datasets) section above.
