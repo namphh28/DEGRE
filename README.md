@@ -164,7 +164,7 @@ See the [Datasets](#datasets) section above.
 See the [Reproducibility](#reproducibility) section above.
 
 ## License
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the Apache-2.0 License. See the `LICENSE` file for details.
 
 ## Contact
 For questions or collaboration, please contact [your.email@example.com].
