@@ -67,7 +67,7 @@ python src/main.py
 
 This script will:
 - Load and preprocess the specified datasets.
-- Train an ensemble of ResNet-50 models and extract training dynamics.
+- Train an ensemble of ResNet-18 models and extract training dynamics.
 - Train the Dynamic Gating Network (DGN).
 - Evaluate DEGRE and baselines, reporting metrics like AURC, AUROC Correctness, and ECE.
 
@@ -105,14 +105,6 @@ The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Det
 | Tuberculosis (TB) Chest X-ray | X-Ray    | TB Detection             |
 
 **Note**: Datasets are not included in this repository due to size and licensing. Refer to the source citations for access.
-
-## Reproducibility
-Following AAAI reproducibility guidelines:
-- **Code**: Will be publicly available at `https://github.com/yourusername/DEGRE` upon publication.
-- **Hyperparameters**:
-  - DGN (MLP): Adam optimizer, learning rate 1e-3, 50 epochs.
-- **Data Splits**: 70/15/15 (train/validation/test), stratified by class.
-- **Environment**: PyTorch 2.0, CUDA 11.8, NVIDIA 3050 GPUs.
 
 ## Results
 DEGRE consistently outperforms baselines across all datasets. Key highlights:
