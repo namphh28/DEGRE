@@ -177,18 +177,6 @@ See the [Reproducibility](#reproducibility) section above.
 ## License
 This project is licensed under the MIT License. See the `LICENSE` file for details.
 
-## Citation
-If you use DEGRE in your research, please cite:
-```
-@article{DEGRE2025,
-  title={DEGRE: Dynamic Gating Ensembles for Trust-Aware Rejection in Medical Image Diagnostics},
-  author={Your Name et al.},
-  journal={Proceedings of the AAAI Conference on Artificial Intelligence},
-  year={2025},
-  url={https://ojs.aaai.org/index.php/AAAI/article/view/XXXXX}
-}
-```
-
 ## Contact
 For questions or collaboration, please contact [your.email@example.com].
 
