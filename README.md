@@ -110,10 +110,9 @@ The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Det
 Following AAAI reproducibility guidelines:
 - **Code**: Will be publicly available at `https://github.com/yourusername/DEGRE` upon publication.
 - **Hyperparameters**:
-  - ResNet-50: Adam optimizer, learning rate 1e-4, batch size 32, 100 epochs.
   - DGN (MLP): Adam optimizer, learning rate 1e-3, 50 epochs.
 - **Data Splits**: 70/15/15 (train/validation/test), stratified by class.
-- **Environment**: PyTorch 2.0, CUDA 11.8, NVIDIA A100 GPUs.
+- **Environment**: PyTorch 2.0, CUDA 11.8, NVIDIA 3050 GPUs.
 
 ## Results
 DEGRE consistently outperforms baselines across all datasets. Key highlights:
@@ -167,7 +166,7 @@ See the [Reproducibility](#reproducibility) section above.
 This project is licensed under the Apache-2.0 License. See the `LICENSE` file for details.
 
 ## Contact
-For questions or collaboration, please contact [your.email@example.com].
+For questions or collaboration, please contact [namphan574@gmail.com].
 
 ## References
 1. DEGRE: Dynamic Gating Ensembles for Trust-Aware Rejection in Medical Diagnostics. (Source document)
