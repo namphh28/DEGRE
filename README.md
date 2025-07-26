@@ -89,17 +89,6 @@ To generate GradCAM visualizations for model interpretability:
 python scripts/visualize.py --model_path models/saved/best_model.pth --image_path data/raw/sample_image.png
 ```
 
-## Requirements
-See `requirements.txt` for a complete list. Key dependencies include:
-```
-torch==2.0.0
-torchvision
-numpy
-scikit-learn
-pytorch-grad-cam
-tqdm
-```
-
 ## Datasets
 The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Details:
 | Dataset Name                  | Modality | Task                     | 
