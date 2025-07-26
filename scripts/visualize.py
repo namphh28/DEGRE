@@ -16,6 +16,7 @@ def visualize(cfg, model_path, image_path, output_dir):
         model_path: Path to the saved model weights.
         image_path: Path to the input image.
         output_dir: Directory to save the visualization.
+        
     """
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
