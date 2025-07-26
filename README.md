@@ -115,8 +115,8 @@ DEGRE consistently outperforms baselines across all datasets. Key highlights:
 See the [Appendix](#appendix) for full results.
 
 ## Model Architecture
-![DEGRE Framework Overview](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621475167_7d285a5a5b2dfa700aff98b844fcbff8.jpg)
-![Dynamic Gating Network Diagram](images/dgn_diagram.png)
+![DEGRE Framework Overview](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621480237_c2a3b9030107913c364e5ef0a67cbfaa.jpg)
+![Dynamic Gating Network Diagram](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621475167_7d285a5a5b2dfa700aff98b844fcbff8.jpg)
 
 ## Appendix
 ### A. Full Experimental Results
