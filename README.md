@@ -2,7 +2,7 @@
 
 ## Abstract
 For artificial intelligence to be safely deployed in high-risk domains, it must reliably know its limits. The paradigm of selective prediction, or learning with a reject option, addresses this by enabling a model to abstain from prediction on inputs it deems unreliable, deferring them to a human expert. While deep ensembles have emerged as a leading approach for uncertainty estimation, their potential is often squandered by rejection methods that rely on static thresholds applied to the mean prediction. This paper introduces a fundamental paradigm shift: we propose to learn a dynamic rejection policy directly from the rich behavioral signals of the ensemble itself. Our framework, DEGRE (Dynamic Ensembles Gating for REjection), is a novel meta-learning approach that trains a lightweight gating network on the ensemble's consensus confidence and its internal disagreement (variance)—to explicitly discriminate between correct and incorrect predictions. Our rigorous evaluation across ten medical imaging (MRI, X-ray, CT) benchmarks is unequivocal: DEGRE establishes a new state-of-the-art, achieving an average risk-coverage (AURC) reduction of 68.2% over the strongest baselines. Crucially, it also produces exceptionally trustworthy predictions, achieving near-perfect calibration (ECE ≈ 0.0022) where other methods fail. Additional contribution towards practical adoption, we show how this adaptive rejection mechanism provides the necessary foundation for robust AI-in-the-loop (AI²L) systems, enabling the safe and responsible deployment of AI in critical clinical workflows.
-
+![DEGRE Framework Overview](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621480237_c2a3b9030107913c364e5ef0a67cbfaa.jpg)
 ## Features
 - **State-of-the-Art Performance**: Reduces AURC by over 68% across CT, MRI, and X-ray datasets [1].
 - **Dynamic Rejection Policy**: A meta-learned gating network replaces static thresholds, improving reliability.
@@ -115,7 +115,6 @@ DEGRE consistently outperforms baselines across all datasets. Key highlights:
 See the [Appendix](#appendix) for full results.
 
 ## Model Architecture
-![DEGRE Framework Overview](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621480237_c2a3b9030107913c364e5ef0a67cbfaa.jpg)
 ![Dynamic Gating Network Diagram](https://github.com/namphh28/DEGRE/blob/main/src/imgs/z6843621475167_7d285a5a5b2dfa700aff98b844fcbff8.jpg)
 
 ## Appendix
