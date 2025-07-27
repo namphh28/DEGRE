@@ -53,10 +53,6 @@ DEGRE/
    - Obtain the datasets listed in the [Appendix](#appendix) (e.g., COVID-QU-Ex, Tuberculosis Chest X-ray) from their respective sources.
    - Place them in `data/raw/` or update `src/utils/config.py` with the correct paths.
 
-5. **Set Up Environment**:
-   - Experiments were conducted with PyTorch 2.0 and CUDA 11.8 on NVIDIA A100 GPUs.
-   - For CPU or other GPU setups, ensure PyTorch is installed with appropriate CUDA support.
-
 ## Usage
 To run the full DEGRE pipeline (data preprocessing, ensemble training, DGN training, and evaluation):
 ```bash
