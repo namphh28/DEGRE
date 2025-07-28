@@ -47,12 +47,7 @@ DEGRE/
    pip install -r requirements.txt
    ```
 
-3. **Install PyTorch-Grad-CAM**:
-   ```bash
-   pip install pytorch-grad-cam
-   ```
-
-4. **Download Datasets**:
+3. **Download Datasets**:
    - Obtain the datasets listed in the [Appendix](#appendix) (e.g., COVID-QU-Ex, Tuberculosis Chest X-ray) from their respective sources.
    - Place them in `data/raw/` or update `src/utils/config.py` with the correct paths.
 
@@ -81,12 +76,6 @@ Rejection Rate: 0.1200
 
 ### Running Specific Baselines
 Modify `src/baselines.py` to select specific baselines (e.g., Temperature Scaling, MCDO, ODIN) and rerun `main.py`.
-
-### Generating Visualizations
-To generate GradCAM visualizations for model interpretability:
-```bash
-python scripts/visualize.py --model_path models/saved/best_model.pth --image_path data/raw/sample_image.png
-```
 
 ## Datasets
 The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Details:
@@ -152,9 +141,6 @@ See the [Appendix](#appendix) for full results.
 
 ### B. Dataset Details
 See the [Datasets](#datasets) section above.
-
-### C. Reproducibility Checklist
-See the [Reproducibility](#reproducibility) section above.
 
 ## License
 This project is licensed under the Apache-2.0 License. See the `LICENSE` file for details.
