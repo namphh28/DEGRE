@@ -48,7 +48,7 @@ DEGRE/
    ```
 
 3. **Download Datasets**:
-   - Obtain the datasets listed in the [Appendix](#Datasets) (e.g., COVID-QU-Ex, Tuberculosis Chest X-ray) from their respective sources.
+   - Obtain the datasets listed in the [Datasets](#Datasets) (e.g., COVID-QU-Ex, Tuberculosis Chest X-ray) from their respective sources.
    - Place them in `data/raw/` or update `src/utils/config.py` with the correct paths.
 
 ## Usage
