@@ -78,21 +78,24 @@ Rejection Rate: 0.1200
 Modify `src/baselines.py` to select specific baselines (e.g., Temperature Scaling, MCDO, ODIN) and rerun `main.py`.
 
 ## Datasets
-The evaluation uses 10 public datasets across CT, MRI, and X-ray modalities. Details:
-| Dataset Name                  | Modality | Task                     | 
-|-------------------------------|----------|--------------------------|
-| Intracranial Hemorrhage       | CT       | Hemorrhage Detection     |
-| SAR-CoV-2 CT Scan             | CT       | COVID-19 Classification  |
-| Head CT - Hemorrhage          | CT       | Hemorrhage Detection     |
-| Brain Tumor MRI               | MRI      | Tumor Classification     |
-| Brain Cancer                  | MRI      | Cancer Classification    |
-| Breast Cancer MRI             | MRI      | Cancer Classification    |
-| COVID-QU-Ex                   | X-Ray    | COVID-19 Diagnosis       |
-| Chest X-Ray (Pneumonia)       | X-Ray    | Pneumonia Classification |
-| CoronaHack Chest X-Ray        | X-Ray    | COVID-19 Detection       |
-| Tuberculosis (TB) Chest X-ray | X-Ray    | TB Detection             |
+The evaluation uses 12 public datasets across CT, MRI, and X-ray modalities. Details:
 
-**Note**: Datasets are not included in this repository due to size and licensing. Refer to the source citations for access.
+| Dataset Name                  | Modality | Task                     | Link |
+|-------------------------------|----------|--------------------------|------|
+| Intracranial Hemorrhage       | CT       | Hemorrhage Detection     | [Link](https://www.kaggle.com/datasets/vbookshelf/computed-tomography-ct-images) |
+| SAR-CoV-2 CT Scan             | CT       | COVID-19 Classification  | [Link](https://www.kaggle.com/datasets/plameneduardo/sarscov2-ctscan-dataset) |
+| Computed Tomography           | CT       | Brain Analysis           | [Link](https://www.kaggle.com/datasets/trainingdatapro/computed-tomography-ct-of-the-brain/code) |
+| Head CT - Hemorrhage          | CT       | Hemorrhage Detection     | [Link](https://www.kaggle.com/datasets/felipekitamura/head-ct-hemorrhage) |
+| Cleaned MRI Image             | MRI      | Brain Image Analysis     | [Link](https://www.kaggle.com/datasets/alaminbhuyan/mri-image-data) |
+| Brain Tumor MRI               | MRI      | Tumor Classification     | [Link](https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset) |
+| Brain Cancer                  | MRI      | Cancer Classification    | [Link](https://www.kaggle.com/datasets/orvile/brain-cancer-mri-dataset/data) |
+| Breast Cancer MRI             | MRI      | Cancer Classification    | [Link](https://www.kaggle.com/datasets/uzairkhan45/breast-cancer-patients-mris/code) |
+| COVID-QU-Ex                   | X-Ray    | COVID-19 Diagnosis       | [Link](https://www.kaggle.com/datasets/anasmohammedtahir/covidqu) |
+| Chest X-Ray (Pneumonia)       | X-Ray    | Pneumonia Classification | [Link](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) |
+| Tuberculosis (TB) Chest X-ray | X-Ray    | TB Detection             | [Link](https://www.kaggle.com/datasets/tawsifurrahman/tuberculosis-tb-chest-xray-dataset) |
+| COVID-19 Radiography Database | X-Ray    | COVID-19 Detection       | [Link](https://www.kaggle.com/datasets/tawsifurrahman/covid19-radiography-database) |
+
+**Note**: Datasets are not included in this repository due to size and licensing. Refer to the linked sources for access.
 
 ## Results
 DEGRE consistently outperforms baselines across all datasets. Key highlights:
