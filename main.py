@@ -24,12 +24,12 @@ from scipy.optimize import minimize # For Beta Calibration
 # --- Configuration and Hyperparameters ---
 class Config:
     def __init__(self):
-        # Thư mục làm việc chung
+        # Common working directory
         self.WORKING_DIR = os.path.abspath(os.getcwd())
         self.DATA_DIR = os.path.join(self.WORKING_DIR, '')
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
-        # Cấu hình các tập dữ liệu
+        # Dataset configurations
         self.DATASETS = {
             'intracranial_hemorrhage': {
                 'name': 'Intracranial Hemorrhage',
@@ -153,73 +153,73 @@ class Config:
             }
         }
 
-        # Thư mục phân loại
-        self.COVID_DIR = os.path.join(self.WORKING_DIR, 'UNNORMAL')  # Thư mục cho nhãn tích cực
-        self.NON_COVID_DIR = os.path.join(self.WORKING_DIR, 'NORMAL')  # Thư mục cho nhãn tiêu cực
+        # Classification directories
+        self.COVID_DIR = os.path.join(self.WORKING_DIR, 'UNNORMAL')  # Directory for positive labels
+        self.NON_COVID_DIR = os.path.join(self.WORKING_DIR, 'NORMAL')  # Directory for negative labels
         os.makedirs(self.COVID_DIR, exist_ok=True)
         os.makedirs(self.NON_COVID_DIR, exist_ok=True)
 
-        # Cấu hình mô hình và huấn luyện
-        self.IMAGE_SIZE = (224, 224)  # Kích thước chuẩn cho nhiều CNN
+        # Model and training configuration
+        self.IMAGE_SIZE = (224, 224)  # Standard size for many CNNs
         self.BATCH_SIZE = 16
-        self.NUM_EPOCHS_PER_MODEL = 2
+        self.NUM_EPOCHS_PER_MODEL = 1
         self.LEARNING_RATE = 1e-4
         self.NUM_ENSEMBLE_MODELS = 3
 
-        # Cấu hình Monte Carlo Dropout (MCDO)
-        self.MCDO_ENABLE = False       # Bật/tắt Monte Carlo Dropout (Baseline A.1)
-        self.MCDO_DROPOUT_RATE = 0.5   # Tỷ lệ dropout cho MCDO
-        self.MCDO_NUM_RUNS = 10        # Đã giảm số lần chạy forward pass cho MCDO để ước tính độ bất định
+        # Monte Carlo Dropout (MCDO) configuration
+        self.MCDO_ENABLE = False       # Enable/disable Monte Carlo Dropout (Baseline A.1)
+        self.MCDO_DROPOUT_RATE = 0.5   # Dropout rate for MCDO
+        self.MCDO_NUM_RUNS = 10        # Reduced number of forward passes for MCDO uncertainty estimation
 
-        # Cấu hình Label Smoothing (Baseline A.2.3)
-        self.LABEL_SMOOTHING_ENABLE = False # Bật/tắt Label Smoothing
-        self.LABEL_SMOOTHING_EPSILON = 0.1 # Tham số epsilon cho Label Smoothing
+        # Label Smoothing configuration (Baseline A.2.3)
+        self.LABEL_SMOOTHING_ENABLE = False # Enable/disable Label Smoothing
+        self.LABEL_SMOOTHING_EPSILON = 0.1 # Epsilon parameter for Label Smoothing
 
-        # Cấu hình Training Dynamics (Baseline B.3)
-        self.ENABLE_TRAINING_DYNAMICS = False # Cờ bật/tắt điều chỉnh độ tin cậy bằng training dynamics
-        self.TRAINING_DYNAMICS_CONF_PENALTY = 0.1 # Mức độ các ví dụ "khó học" trong quá trình huấn luyện làm giảm độ tin cậy của các ví dụ test tương tự
+        # Training Dynamics configuration (Baseline B.3)
+        self.ENABLE_TRAINING_DYNAMICS = False # Flag to enable/disable confidence adjustment using training dynamics
+        self.TRAINING_DYNAMICS_CONF_PENALTY = 0.1 # Degree to which "hard-to-learn" examples during training reduce confidence of similar test examples
         
         # ODIN/Energy Score Parameters (Baseline B.1.x, B.2.x)
-        self.ODIN_TEMP = 1000.0 # Nhiệt độ cho ODIN. Nhiệt độ cao thường hoạt động tốt.
-        self.ODIN_EPSILON = 0.001 # Độ lớn nhiễu loạn cho ODIN (có thể điều chỉnh dựa trên tập dữ liệu)
-        self.ENERGY_CLASSIFY_PERCENTILE_THRESHOLD = 20 # Các mẫu với điểm năng lượng trong X% thấp nhất được coi là OOD tiềm năng
+        self.ODIN_TEMP = 1000.0 # Temperature for ODIN. High temperature usually works well.
+        self.ODIN_EPSILON = 0.001 # Perturbation magnitude for ODIN (can be adjusted based on dataset)
+        self.ENERGY_CLASSIFY_PERCENTILE_THRESHOLD = 20 # Samples with energy scores in lowest X% are considered potential OOD
         
-        # Mục tiêu từ chối
-        self.TARGET_ACCEPTED_ACCURACY = 0.99 # 99.5% độ chính xác trên các trường hợp được chấp nhận
-        self.TARGET_REJECTION_RATE = 0.05      # Từ chối khoảng 5% các trường hợp
+        # Rejection objectives
+        self.TARGET_ACCEPTED_ACCURACY = 0.99 # 99.5% accuracy on accepted cases
+        self.TARGET_REJECTION_RATE = 0.05      # Reject approximately 5% of cases
 
-        # Các tham số có thể điều chỉnh thủ công cho phân loại chọn lọc (thử nghiệm với chúng!)
-        self.DISAGREEMENT_PENALTY_FACTOR = 5.0 # Mức độ bất đồng của ensemble làm giảm độ tin cậy
+        # Manually adjustable parameters for selective classification (experiment with them!)
+        self.DISAGREEMENT_PENALTY_FACTOR = 5.0 # Degree to which ensemble disagreement reduces confidence
         
-        # Trọng số cho mục tiêu tối ưu hóa ngưỡng từ chối (mức độ quan trọng của mỗi yếu tố)
-        # Các trọng số này cho phép điều chỉnh sự đánh đổi giữa độ chính xác được chấp nhận, tỷ lệ từ chối và ECE
-        self.ACCURACY_DEVIATION_WEIGHT = 2.5 # Trọng số cao để mạnh mẽ thực thi TARGET_ACCEPTED_ACCURACY
-        self.REJECTION_RATE_DEVIATION_WEIGHT = 1.0 # Trọng số chuẩn cho độ lệch tỷ lệ từ chối
-        self.ECE_DEVIATION_WEIGHT = 5.0       # Trọng số cho ECE trong tối ưu hóa ngưỡng từ chối (điều chỉnh cái này, giá trị cao hơn có nghĩa là tập chấp nhận được hiệu chỉnh tốt hơn)
+        # Weights for rejection threshold optimization objective (importance of each factor)
+        # These weights allow tuning the trade-off between accepted accuracy, rejection rate, and ECE
+        self.ACCURACY_DEVIATION_WEIGHT = 2.5 # High weight to strongly enforce TARGET_ACCEPTED_ACCURACY
+        self.REJECTION_RATE_DEVIATION_WEIGHT = 1.0 # Standard weight for rejection rate deviation
+        self.ECE_DEVIATION_WEIGHT = 5.0       # Weight for ECE in rejection threshold optimization (adjust this, higher values mean better calibrated accepted set)
 
-        # Ngưỡng phát hiện OOD (có thể điều chỉnh thủ công trong categorize_rejected_cases)
-        # Đây là các ngưỡng được sử dụng để PHÂN LOẠI các trường hợp từ chối, KHÔNG phải để ra quyết định từ chối ban đầu
-        self.OOD_CONFIDENCE_THRESHOLD = 0.65 # Các mẫu dưới độ tin cậy này
-        self.OOD_VARIANCE_THRESHOLD = 0.08  # Và trên phương sai này là OOD tiềm năng (dùng cho các baseline cũ)
-        self.ODIN_CLASSIFY_THRESHOLD = 0.8 # Các mẫu với điểm ODIN < ngưỡng này được coi là OOD tiềm năng
-        # Bật/tắt Weighted Logits theo Độ tin cậy (ECE)
+        # OOD detection thresholds (can be manually adjusted in categorize_rejected_cases)
+        # These are thresholds used to CLASSIFY rejected cases, NOT for initial rejection decisions
+        self.OOD_CONFIDENCE_THRESHOLD = 0.65 # Samples below this confidence
+        self.OOD_VARIANCE_THRESHOLD = 0.08  # And above this variance are potential OOD (used for old baselines)
+        self.ODIN_CLASSIFY_THRESHOLD = 0.8 # Samples with ODIN score < this threshold are considered potential OOD
+        # Enable/disable Weighted Logits by Confidence (ECE)
         self.USE_WEIGHTED_ENSEMBLE = True 
         
-        # Bật/tắt Dynamic Ensemble Selection (chỉ chọn model tốt nhất cho từng mẫu)
-        # Lưu ý: Đặt NUM_ENSEMBLE_MODELS = 3 để logic chọn 2/3 hoạt động đúng
+        # Enable/disable Dynamic Ensemble Selection (only select best model for each sample)
+        # Note: Set NUM_ENSEMBLE_MODELS = 3 for 2/3 selection logic to work correctly
         self.USE_DYNAMIC_SELECTION = True
-        self.DYNAMIC_SELECTION_COUNT = 2 # Chọn 2 model tốt nhất
+        self.DYNAMIC_SELECTION_COUNT = 2 # Select 2 best models
 
-        # Hằng số nhỏ để tránh chia cho 0 khi tính trọng số từ ECE
+        # Small constant to avoid division by zero when calculating weights from ECE
         self.EPSILON_ECE = 1e-8
 
-        # Các cài đặt khác
+        # Other settings
         self.RANDOM_SEED = 42
         self.DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.MODEL_SAVE_DIR = 'working/models' # Thư mục để lưu các mô hình ensemble đã huấn luyện
+        self.MODEL_SAVE_DIR = 'working/models' # Directory to save trained ensemble models
         os.makedirs(self.MODEL_SAVE_DIR, exist_ok=True)
-        self.XAI_SAVE_DIR = 'working/xai_visualizations' # Thư mục để lưu các hình ảnh XAI
-        os.makedirs(self.XAI_SAVE_DIR, exist_ok=True) # Đảm bảo thư mục đầu ra XAI tồn tại
+        self.XAI_SAVE_DIR = 'working/xai_visualizations' # Directory to save XAI visualizations
+        os.makedirs(self.XAI_SAVE_DIR, exist_ok=True) # Ensure XAI output directory exists
 
         self.ODIN_TEMPERATURE = 1000  # Temperature for ODIN
         self.ODIN_UPDATE_PREDICTIONS = False  # Whether to update predictions based on ODIN perturbed probs
@@ -228,9 +228,9 @@ class Config:
 
 cfg = Config()
 
-# Thiết lập seed ngẫu nhiên để tái sản xuất kết quả
+# Set random seed for reproducible results
 def set_seed(seed):
-    """Đặt seed ngẫu nhiên để tái sản xuất kết quả trên các thư viện khác nhau."""
+    """Set random seed for reproducible results across different libraries."""
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -240,22 +240,22 @@ def set_seed(seed):
 
 set_seed(cfg.RANDOM_SEED)
 
-print(f"Sử dụng thiết bị: {cfg.DEVICE}")
+print(f"Using device: {cfg.DEVICE}")
 
-# --- 1. Tải và tiền xử lý dữ liệu ---
+# --- 1. Data Loading and Preprocessing ---
 class CTScanDataset(Dataset):
     """
-    Lớp Dataset tùy chỉnh để tải hình ảnh CT scan và nhãn của chúng.
-    Xử lý đường dẫn hình ảnh và áp dụng các phép biến đổi.
-    Trả về hình ảnh, nhãn, và chỉ mục toàn cục gốc của nó.
+    Custom Dataset class to load CT scan images and their labels.
+    Handles image paths and applies transformations.
+    Returns image, label, and its original global index.
     """
     def __init__(self, image_paths, labels, transform=None, global_indices=None):
         self.image_paths = image_paths
         self.labels = labels
         self.transform = transform
-        # Đảm bảo global_indices là một mảng numpy
+        # Ensure global_indices is a numpy array
         self.global_indices = np.array(global_indices) if global_indices is not None else np.arange(len(image_paths))
-        # Tạo ánh xạ từ global_idx đến local idx trong phân tách này để tra cứu thuận tiện
+        # Create mapping from global_idx to local idx in this split for convenient lookup
         self.original_indices_map = {self.global_indices[i]: i for i in range(len(self.global_indices))}
 
     def __len__(self):
@@ -263,14 +263,14 @@ class CTScanDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
-        image = Image.open(img_path).convert('RGB') # Đảm bảo 3 kênh cho các mô hình tiền huấn luyện
+        image = Image.open(img_path).convert('RGB') # Ensure 3 channels for pre-trained models
         label = self.labels[idx]
-        global_idx = self.global_indices[idx] # Trả về chỉ mục toàn cục gốc
+        global_idx = self.global_indices[idx] # Return original global index
 
         if self.transform:
             image = self.transform(image)
 
-        return image, label, global_idx # Trả về chỉ mục toàn cục gốc để theo dõi động lực huấn luyện
+        return image, label, global_idx # Return original global index for tracking training dynamics
 
 class HemorrhagicDataset(Dataset):
     def __init__(self, root_dir, csv_file, transform=None, train=True, split_ratio=0.7):
@@ -340,11 +340,11 @@ def organize_data(labels_df, data_dir, covid_dir, non_covid_dir):
     for index, row in labels_df.iterrows():
         img_id = row['id']
         hemorrhage = row['hemorrhage']
-        img_filename = f"{img_id:03d}.png"  # Định dạng tên file ảnh (001.jpg, 002.jpg, ...)
+        img_filename = f"{img_id:03d}.png"  # Image filename format (001.jpg, 002.jpg, ...)
         src_path = os.path.join(data_dir, img_filename)
         
         if not os.path.exists(src_path):
-            print(f"Không tìm thấy file: {src_path}")
+            print(f"File not found: {src_path}")
             continue
         
         if hemorrhage == 1:
@@ -353,40 +353,40 @@ def organize_data(labels_df, data_dir, covid_dir, non_covid_dir):
             dest_path = os.path.join(non_covid_dir, img_filename)
         
         try:
-            shutil.copy(src_path, dest_path)  # Sao chép file
-            print(f"Đã sao chép {img_filename} đến {dest_path}")
+            shutil.copy(src_path, dest_path)  # Copy file
+            print(f"Copied {img_filename} to {dest_path}")
         except Exception as e:
-            print(f"Lỗi khi sao chép {img_filename}: {str(e)}")
+            print(f"Error copying {img_filename}: {str(e)}")
 
 def classify_images_to_dirs(dataset, covid_dir, non_covid_dir):
     """
-    Phân loại hình ảnh từ HemorrhagicDataset vào hai thư mục dựa trên nhãn.
+    Classify images from HemorrhagicDataset into two directories based on labels.
     
     Args:
         dataset: HemorrhagicDataset instance
-        covid_dir: Thư mục đích cho hình ảnh "hemorrhagic"
-        non_covid_dir: Thư mục đích cho hình ảnh "normal"
+        covid_dir: Destination directory for "hemorrhagic" images
+        non_covid_dir: Destination directory for "normal" images
     """
     for idx in tqdm(range(len(dataset)), desc="Classifying images"):
         sample = dataset[idx]
         image_path = os.path.join(dataset.slices[idx][0], f"{dataset.slices[idx][2]}.jpg")
         label = sample['label']
         
-        # Xác định thư mục đích dựa trên nhãn
+        # Determine destination directory based on label
         if label == "hemorrhagic":
             dest_dir = covid_dir
         else:
             dest_dir = non_covid_dir
             
-        # Tạo tên file đích
+        # Create destination filename
         patient_number = dataset.slices[idx][1]
         slice_number = dataset.slices[idx][2]
         dest_filename = f"{patient_number}_{slice_number}.jpg"
         dest_path = os.path.join(dest_dir, dest_filename)
         
-        # Sao chép hoặc tạo liên kết mềm tới thư mục đích
-        shutil.copy(image_path, dest_path)  # Sử dụng shutil.copy để sao chép file
-        # Nếu bạn muốn tiết kiệm dung lượng, có thể dùng liên kết mềm:
+        # Copy or create soft link to destination directory
+        shutil.copy(image_path, dest_path)  # Use shutil.copy to copy file
+        # If you want to save space, you can use soft link:
         # os.symlink(image_path, dest_path)
 
 def prepare_datasets(cfg, dataset_name):
@@ -396,7 +396,7 @@ def prepare_datasets(cfg, dataset_name):
     label_2 = dataset_config['label_2']
     custom_dataset_class = dataset_config.get('custom_dataset_class')
 
-    # Xử lý tập dữ liệu tùy chỉnh
+    # Handle custom datasets
     if custom_dataset_class == 'HemorrhagicDataset':
         transform = transforms.Compose([
             transforms.Resize((512, 512)),
@@ -421,11 +421,11 @@ def prepare_datasets(cfg, dataset_name):
         labels_df.rename(columns={' hemorrhage': 'hemorrhage'}, inplace=True)
         organize_data(labels_df, os.path.join(extract_path, label_1), cfg.COVID_DIR, cfg.NON_COVID_DIR)
     else:
-        # Sử dụng đường dẫn label_1 và label_2 trực tiếp
+        # Use label_1 and label_2 paths directly
         cfg.COVID_DIR = os.path.join(extract_path, label_1)
         cfg.NON_COVID_DIR = os.path.join(extract_path, label_2)
 
-    # Thu thập đường dẫn và nhãn
+    # Collect paths and labels
     all_image_paths_raw = []
     all_labels_raw = []
     covid_paths = [os.path.join(cfg.COVID_DIR, f) for f in os.listdir(cfg.COVID_DIR) if f.endswith(('.png', '.jpg'))]
@@ -435,33 +435,33 @@ def prepare_datasets(cfg, dataset_name):
     all_image_paths_raw.extend(non_covid_paths)
     all_labels_raw.extend([0] * len(non_covid_paths))
 
-    # Thu thập hình ảnh COVID
+    # Collect COVID images
     covid_paths = [os.path.join(cfg.COVID_DIR, f) for f in os.listdir(cfg.COVID_DIR) if f.endswith('.png') or f.endswith('.jpg')]
     all_image_paths_raw.extend(covid_paths)
-    all_labels_raw.extend([1] * len(covid_paths)) # 1 cho COVID
+    all_labels_raw.extend([1] * len(covid_paths)) # 1 for COVID
 
-    # Thu thập hình ảnh Non-COVID
+    # Collect Non-COVID images
     non_covid_paths = [os.path.join(cfg.NON_COVID_DIR, f) for f in os.listdir(cfg.NON_COVID_DIR) if f.endswith('.png') or f.endswith('.jpg')]
     all_image_paths_raw.extend(non_covid_paths)
-    all_labels_raw.extend([0] * len(non_covid_paths)) # 0 cho non-COVID
+    all_labels_raw.extend([0] * len(non_covid_paths)) # 0 for non-COVID
 
-    # Gán chỉ mục toàn cục
+    # Assign global indices
     all_global_indices = list(range(len(all_image_paths_raw)))
 
-    print(f"Tổng số hình ảnh tìm thấy: {len(all_image_paths_raw)}")
-    print(f"Hình ảnh COVID: {len(covid_paths)}, Hình ảnh Non-COVID: {len(non_covid_paths)}")
+    print(f"Total images found: {len(all_image_paths_raw)}")
+    print(f"COVID images: {len(covid_paths)}, Non-COVID images: {len(non_covid_paths)}")
 
-    # Tạo các phân tách phân tầng cho tập huấn luyện+validation và tập test trước
-    # Mong muốn: Test = 15% tổng số.
+    # Create stratified splits for train+validation and test sets first
+    # Desired: Test = 15% of total.
     train_val_paths, test_paths, train_val_labels, test_labels, \
     train_val_global_indices, test_global_indices = train_test_split(
         all_image_paths_raw, all_labels_raw, all_global_indices,
         test_size=0.15, random_state=cfg.RANDOM_SEED, stratify=all_labels_raw
     )
     
-    # Sau đó, chia tập train_val thành các tập huấn luyện và validation thực tế
-    # train_val là 85% tổng số. Chúng ta muốn Val = 15% tổng số.
-    # Vì vậy, val_size_relative_to_train_val = 0.15 / (1.0 - 0.15)
+    # Then, split train_val into actual training and validation sets
+    # train_val is 85% of total. We want Val = 15% of total.
+    # So, val_size_relative_to_train_val = 0.15 / (1.0 - 0.15)
     val_size_relative_to_train_val = 0.15 / (1.0 - 0.15)
     train_paths, val_paths, train_labels, val_labels, \
     train_global_indices, val_global_indices = train_test_split(
@@ -469,18 +469,18 @@ def prepare_datasets(cfg, dataset_name):
         test_size=val_size_relative_to_train_val, random_state=cfg.RANDOM_SEED, stratify=train_val_labels
     )
 
-    print(f"Kích thước tập huấn luyện: {len(train_paths)}")
-    print(f"Kích thước tập Validation: {len(val_paths)}")
-    print(f"Kích thước tập Test: {len(test_paths)}") # test_paths này tham chiếu đến tập test cuối cùng, độc lập
+    print(f"Training set size: {len(train_paths)}")
+    print(f"Validation set size: {len(val_paths)}")
+    print(f"Test set size: {len(test_paths)}") # test_paths refers to final test set, independent
 
-    # Định nghĩa các phép biến đổi
+    # Define transformations
     train_transform = transforms.Compose([
         transforms.Resize(cfg.IMAGE_SIZE),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
         transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # Chuẩn hóa ImageNet
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet normalization
     ])
 
     val_test_transform = transforms.Compose([
@@ -489,7 +489,7 @@ def prepare_datasets(cfg, dataset_name):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # Truyền global_indices vào constructor của Dataset
+    # Pass global_indices to Dataset constructor
     train_dataset = CTScanDataset(train_paths, train_labels, train_transform, train_global_indices)
     val_dataset = CTScanDataset(val_paths, val_labels, val_test_transform, val_global_indices)
     test_dataset = CTScanDataset(test_paths, test_labels, val_test_transform, test_global_indices)
@@ -500,58 +500,58 @@ def prepare_datasets(cfg, dataset_name):
 
     return train_loader, val_loader, test_loader, train_dataset, val_dataset, test_dataset
 
-# --- 2. Định nghĩa Base Classifier ---
+# --- 2. Base Classifier Definition ---
 class BaseClassifier(nn.Module):
     """
-    Một bộ phân loại CNN cơ bản sử dụng mô hình ResNet tiền huấn luyện.
-    Bao gồm một bộ trích xuất đặc trưng rõ ràng để dễ dàng kết nối cho Grad-CAM
-    và để lấy đặc trưng cho phân tích dựa trên sự tương đồng.
-    Tích hợp các lớp Dropout cho Monte Carlo Dropout (MCDO).
+    A basic CNN classifier using pre-trained ResNet model.
+    Includes a clear feature extractor for easy connection to Grad-CAM
+    and for extracting features for similarity-based analysis.
+    Integrates dropout layers for Monte Carlo Dropout (MCDO).
     """
     def __init__(self, num_classes=2, dropout_rate=0.0):
         super(BaseClassifier, self).__init__()
         self.dropout_rate = dropout_rate
-        # Tải mô hình ResNet18 tiền huấn luyện
+        # Load pre-trained ResNet18 model
         self.model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
         
-        # Xác định lớp mục tiêu cho Grad-CAM (lớp tích chập cuối cùng)
+        # Identify target layer for Grad-CAM (last convolutional layer)
         self.target_layer = self.model.layer4[-1] 
         
-        # Định nghĩa phần trích xuất đặc trưng (mọi thứ trước lớp FC cuối cùng)
+        # Define feature extractor part (everything before final FC layer)
         feature_extractor_layers = list(self.model.children())[:-1]
         
-        # Thêm lớp dropout nếu dropout_rate dương
+        # Add dropout layer if dropout_rate is positive
         if self.dropout_rate > 0:
-            # Tìm chỉ mục của lớp AdaptiveAvgPool2d để chèn dropout sau nó
+            # Find index of AdaptiveAvgPool2d layer to insert dropout after it
             try:
                 avgpool_idx = [i for i, layer in enumerate(feature_extractor_layers) if isinstance(layer, nn.AdaptiveAvgPool2d)][0]
                 feature_extractor_layers.insert(avgpool_idx + 1, nn.Dropout(p=self.dropout_rate))
-                print(f"Đã thêm lớp Dropout với tỷ lệ {self.dropout_rate} vào bộ trích xuất đặc trưng.")
+                print(f"Added Dropout layer with rate {self.dropout_rate} to feature extractor.")
             except IndexError:
-                print("Cảnh báo: Không tìm thấy lớp AdaptiveAvgPool2d. Đang thêm Dropout sau tất cả các lớp tích chập.")
+                print("Warning: AdaptiveAvgPool2d layer not found. Adding Dropout after all convolutional layers.")
                 feature_extractor_layers.append(nn.Dropout(p=self.dropout_rate))
 
 
         self.feature_extractor = nn.Sequential(*feature_extractor_layers)
         
-        # Thay thế lớp kết nối đầy đủ cuối cùng cho phân loại nhị phân
+        # Replace final fully connected layer for binary classification
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)
 
     def forward(self, x):
-        # Forward pass qua bộ trích xuất đặc trưng
+        # Forward pass through feature extractor
         features = self.feature_extractor(x)
-        features = torch.flatten(features, 1) # Làm phẳng các đặc trưng
-        # Forward pass qua lớp phân loại cuối cùng
+        features = torch.flatten(features, 1) # Flatten features
+        # Forward pass through final classification layer
         output = self.model.fc(features)
         return output
 
     def get_features(self, x):
         """
-        Trích xuất đặc trưng từ lớp trước đầu phân loại cuối cùng.
+        Extract features from the layer before final classification.
         """
-        # Lưu ý: Các lớp Dropout trong feature_extractor sẽ tự động tắt nếu model.eval()
-        # hoặc hoạt động nếu model.train() và dropout_rate > 0
+        # Note: Dropout layers in feature_extractor will automatically turn off if model.eval()
+        # or activate if model.train() and dropout_rate > 0
         with torch.no_grad(): 
             features = self.feature_extractor(x)
             features = torch.flatten(features, 1) 
@@ -829,11 +829,11 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
 
 def train_ensemble(cfg, train_loader, val_loader):
     """
-    Train ensemble của NUM_ENSEMBLE_MODELS models và trả về training dynamics.
+    Train ensemble of NUM_ENSEMBLE_MODELS models and return training dynamics.
     """
     print(f"🔥 Training ensemble of {cfg.NUM_ENSEMBLE_MODELS} models...")
     
-    # Khởi tạo dictionary để lưu trữ learning metrics từ tất cả models
+    # Initialize dictionary to store learning metrics from all models
     overall_learning_metrics = {}
     
     for i in range(cfg.NUM_ENSEMBLE_MODELS):
@@ -842,20 +842,20 @@ def train_ensemble(cfg, train_loader, val_loader):
         # Set different seed for diversity
         set_seed(cfg.RANDOM_SEED + i)
         
-        # Tạo model mới cho mỗi ensemble member
+        # Create new model for each ensemble member
         model = BaseClassifier(
             num_classes=2, 
             dropout_rate=(cfg.MCDO_DROPOUT_RATE if cfg.MCDO_ENABLE else 0.0)
         )
         
-        # Train model và thu thập learning metrics
+        # Train model and collect learning metrics
         individual_learning_metrics = train_model(
             model, train_loader, val_loader, 
             cfg.NUM_EPOCHS_PER_MODEL, cfg.LEARNING_RATE, 
             cfg.DEVICE, i, cfg
         )
         
-        # Merge learning metrics từ model này vào overall metrics  
+        # Merge learning metrics from this model into overall metrics  
         for global_idx, metrics in individual_learning_metrics.items():
             if global_idx not in overall_learning_metrics:
                 overall_learning_metrics[global_idx] = {
@@ -875,7 +875,7 @@ def train_ensemble(cfg, train_loader, val_loader):
     # Aggregate learning metrics across all ensemble members
     final_overall_learning_metrics = {}
     for global_idx, all_model_metrics in overall_learning_metrics.items():
-        # Tính average learning metrics across ensemble members với tên đúng
+        # Calculate average learning metrics across ensemble members with correct names
         avg_conf_list = all_model_metrics['avg_correct_confidence_list']
         epoch_list = all_model_metrics['first_correct_epoch_list']
         consistency_list = all_model_metrics['consistency_list']
@@ -891,11 +891,11 @@ def train_ensemble(cfg, train_loader, val_loader):
     
     return final_overall_learning_metrics
 
-# --- 5. Ước tính và hiệu chỉnh độ tin cậy nâng cao ---
+# --- 5. Advanced Confidence Estimation and Calibration ---
 class TemperatureScaler(nn.Module):
     """
-    Học một tham số nhiệt độ scalar duy nhất để hiệu chỉnh các xác suất.
-    Dựa trên Guo et al. "On Calibration of Modern Neural Networks" (ICML 2017).
+    Learn a single scalar temperature parameter to calibrate probabilities.
+    Based on Guo et al. "On Calibration of Modern Neural Networks" (ICML 2017).
     """
     def __init__(self):
         super().__init__()
@@ -906,9 +906,9 @@ class TemperatureScaler(nn.Module):
 
     def calibrate(self, logits_to_calibrate, labels_for_calibration, device):
         """
-        Điều chỉnh tham số nhiệt độ bằng cách sử dụng các logits và nhãn đã tính toán trước.
+        Adjust temperature parameter using pre-computed logits and labels.
         """
-        # Đảm bảo logits và nhãn nằm trên thiết bị chính xác
+        # Ensure logits and labels are on the correct device
         logits_all = logits_to_calibrate.to(device)
         labels_all = labels_for_calibration.to(device)
 
@@ -922,11 +922,11 @@ class TemperatureScaler(nn.Module):
             return loss
 
         optimizer.step(eval)
-        print(f"Bộ hiệu chỉnh nhiệt độ đã được hiệu chỉnh. Tối ưu T: {self.temperature.item():.4f}")
+        print(f"Temperature calibrator has been calibrated. Optimal T: {self.temperature.item():.4f}")
 
 class IsotonicCalibrator:
     """
-    Hiệu chỉnh bằng Isotonic Regression.
+    Calibration using Isotonic Regression.
     """
     def __init__(self):
         self.ir = IsotonicRegression(out_of_bounds="clip")
@@ -935,7 +935,7 @@ class IsotonicCalibrator:
         # confidences_to_calibrate should be 1D array of confidence scores
         # labels_for_calibration should be 1D array of binary labels (0 or 1)
         self.ir.fit(confidences_to_calibrate, labels_for_calibration)
-        print("Isotonic Regression đã được hiệu chỉnh.")
+        print("Isotonic Regression has been calibrated.")
 
     def predict_proba(self, confidences_to_transform):
         return self.ir.transform(confidences_to_transform)
@@ -943,8 +943,8 @@ class IsotonicCalibrator:
 
 class BetaCalibrator:
     """
-    Hiệu chỉnh bằng Beta Calibration.
-    Tham số alpha và beta của phân phối Beta được tối ưu hóa.
+    Calibration using Beta Calibration.
+    Alpha and beta parameters of Beta distribution are optimized.
     """
     def __init__(self):
         self.alpha = None
@@ -977,11 +977,11 @@ class BetaCalibrator:
                           bounds=[(0.01, None), (None, None)]) # alpha must be positive
         
         self.alpha, self.beta = result.x
-        print(f"Beta Calibration đã được hiệu chỉnh. Alpha: {self.alpha:.4f}, Beta: {self.beta:.4f}")
+        print(f"Beta Calibration has been calibrated. Alpha: {self.alpha:.4f}, Beta: {self.beta:.4f}")
 
     def predict_proba(self, confidences_to_transform):
         if self.alpha is None or self.beta is None:
-            raise ValueError("BetaCalibrator chưa được hiệu chỉnh. Vui lòng gọi .calibrate() trước.")
+            raise ValueError("BetaCalibrator has not been calibrated. Please call .calibrate() first.")
         
         conf_clamped = np.clip(confidences_to_transform, 1e-10, 1 - 1e-10)
         logit_original = np.log(conf_clamped / (1 - conf_clamped))
@@ -990,16 +990,16 @@ class BetaCalibrator:
 
 def extract_features(model, data_loader, device):
     """
-    Trích xuất đặc trưng từ feature_extractor của mô hình cho tất cả các mẫu trong data_loader.
-    Trả về các đặc trưng dưới dạng mảng numpy và các chỉ mục toàn cục gốc tương ứng.
+    Extract features from model's feature_extractor for all samples in data_loader.
+    Returns features as numpy array and corresponding original global indices.
     """
-    model.eval() # Đảm bảo model ở chế độ eval cho việc trích xuất đặc trưng thông thường
+    model.eval() # Ensure model is in eval mode for normal feature extraction
     all_features = []
     all_indices = []
     with torch.no_grad():
-        for inputs, _, global_indices_batch in tqdm(data_loader, desc="Trích xuất Đặc trưng", dynamic_ncols=True):
+        for inputs, _, global_indices_batch in tqdm(data_loader, desc="Extracting Features", dynamic_ncols=True):
             inputs = inputs.to(device)
-            features = model.get_features(inputs) # Sử dụng phương thức get_features mới
+            features = model.get_features(inputs) # Use new get_features method
             all_features.append(features.cpu().numpy())
             all_indices.extend(global_indices_batch.cpu().numpy())
     return np.vstack(all_features), np.array(all_indices)
@@ -1008,18 +1008,18 @@ def extract_features(model, data_loader, device):
 def adjust_confidence_with_training_dynamics(cfg, test_features, current_scores,
                                              train_features, train_global_indices, final_overall_learning_metrics):
     """
-    Điều chỉnh điểm tin cậy/từ chối của tập test dựa trên sự tương đồng với các mẫu huấn luyện và động lực học của chúng.
-    Điểm thấp hơn đối với các mẫu test tương tự các mẫu huấn luyện 'khó' (ví dụ: học muộn, không nhất quán).
+    Adjust confidence/rejection scores of test set based on similarity with training samples and their learning dynamics.
+    Lower scores for test samples similar to 'difficult' training samples (e.g., learned late, inconsistent).
     """
-    print("Điều chỉnh điểm của tập test với động lực huấn luyện...")
+    print("Adjusting test set scores with training dynamics...")
     adjusted_scores = np.copy(current_scores)
 
-    # Tạo ánh xạ từ global_idx đến từ điển learning metrics để tra cứu hiệu quả
+    # Create mapping from global_idx to learning metrics dictionary for efficient lookup
     train_global_idx_to_metrics = {idx: metrics for idx, metrics in final_overall_learning_metrics.items()}
 
-    # Tính toán độ tương đồng cosine giữa các đặc trưng test và huấn luyện
+    # Calculate cosine similarity between test and training features
     if len(test_features) == 0 or len(train_features) == 0:
-        print("Bỏ qua điều chỉnh động lực huấn luyện: Không có đặc trưng test hoặc huấn luyện.")
+        print("Skipping training dynamics adjustment: No test or training features.")
         return adjusted_scores
 
     similarities = cosine_similarity(test_features, train_features)
@@ -1717,33 +1717,6 @@ def run_baseline(config_name, mcdo_enable, label_smoothing_enable,
     print(f"Số lượng Trường hợp Từ chối Không rõ/Mơ hồ: {len(rejected_categories_info['unknown_ambiguous_indices'])}") 
     print(f"Số lượng Trường hợp Từ chối OOD tiềm năng: {len(rejected_categories_info['potential_ood_indices'])}") 
 
-    # 7. Tạo Hình ảnh XAI cho các trường hợp quan trọng
-    # loaded_ensemble_models_for_xai = []
-    # for i_idx in range(cfg.NUM_ENSEMBLE_MODELS):
-    #     model = BaseClassifier(num_classes=2, dropout_rate=(cfg.MCDO_DROPOUT_RATE if cfg.MCDO_ENABLE else 0.0)).to(cfg.DEVICE)
-    #     model.load_state_dict(torch.load(os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{i_idx}.pth')))
-    #     model.eval() 
-    #     loaded_ensemble_models_for_xai.append(model)
-        
-    # test_results_for_xai = {
-    #     'model_preds': test_model_predictions,
-    #     'rejection_scores': test_rejection_scores,
-    #     'true_labels': test_true_labels,
-    #     'original_indices': test_original_indices,
-    #     'rejected_categories': rejected_categories_info
-    # }
-    
-    # print(f"Đảm bảo thư mục lưu XAI tồn tại: {cfg.XAI_SAVE_DIR}")
-    # os.makedirs(cfg.XAI_SAVE_DIR, exist_ok=True)
-    # visualize_xai_examples(cfg, loaded_ensemble_models_for_xai, test_dataset, test_results_for_xai, best_rejection_threshold)
-
-    # # ✅ FIXED: 8. Trực quan hóa các đường cong hiệu suất riêng cho baseline này
-    # print("\\n--- Trực quan hóa các đường cong hiệu suất ---")
-    # plot_individual_baseline_charts(test_model_predictions, test_rejection_scores, test_true_labels, config_name, cfg.XAI_SAVE_DIR)
-
-    # print(f"\\n{'='*20}\\nHoàn tất chạy Baseline: {config_name}\\n{'='*20}")
-    
-    # ✅ FIXED: Trả về structure giống main.py với tất cả metrics cần thiết
     return {
         'metrics': {
             'Config Name': config_name,
@@ -2499,6 +2472,229 @@ def plot_risk_coverage_comparison(all_baseline_results, all_baseline_test_result
     plt.show()
     plt.close()
 
+def compute_gradient_norm(model, inputs, device):
+    """Computes the L2 norm of gradients of the model's output w.r.t. the input."""
+    model.eval()
+    inputs = inputs.clone().detach().requires_grad_(True).to(device)
+    with torch.set_grad_enabled(True):
+        outputs = model(inputs)
+        max_scores = torch.max(outputs, dim=1)[0]
+        model.zero_grad()
+        max_scores.sum().backward()
+    grad_norm = torch.norm(inputs.grad, p=2, dim=(1, 2, 3))
+    return grad_norm.detach()
+
+# --- Compute Gating Features with Training Dynamics ---
+def compute_gating_features_integrated(logits_list, models, inputs, test_features, train_feature_store, train_dynamics_store, device):
+    """
+    Computes features for the Gating Network, integrating training dynamics.
+    For each test sample, it finds the most similar training sample and uses its
+    learning metrics (difficulty, consistency) as additional features.
+    """
+    probs_list = [torch.softmax(logits, dim=1) for logits in logits_list]
+    entropies = [-(p * torch.log(p + 1e-8)).sum(dim=1).unsqueeze(1) for p in probs_list]
+    
+    def get_margin(p):
+        top2 = torch.topk(p, 2, dim=1).values
+        return (top2[:, 0] - top2[:, 1]).unsqueeze(1)
+    margins = [get_margin(p) for p in probs_list]
+    grad_norms = [compute_gradient_norm(model, inputs, device).unsqueeze(1) for model in models]
+
+    # Calculate similarity between current batch and training feature store
+    similarities = cosine_similarity(test_features.cpu().numpy(), train_feature_store['features'])
+    most_similar_indices = np.argmax(similarities, axis=1)
+    
+    # Retrieve dynamics for the most similar training samples
+    similar_dynamics = train_dynamics_store[most_similar_indices]
+    
+    # Normalize and convert to tensor
+    difficulty_features = torch.tensor(similar_dynamics[:, 0] / cfg.NUM_EPOCHS_PER_MODEL, dtype=torch.float32, device=device).unsqueeze(1)
+    consistency_features = torch.tensor(similar_dynamics[:, 1], dtype=torch.float32, device=device).unsqueeze(1)
+    
+    # Concatenate all features
+    all_features = logits_list + entropies + margins + grad_norms + [difficulty_features, consistency_features]
+    
+    return torch.cat(all_features, dim=1)
+
+# --- Brier Score Loss ---
+class BrierScoreLoss(nn.Module):
+    def forward(self, probabilities, targets):
+        one_hot_targets = nn.functional.one_hot(targets, num_classes=probabilities.shape[1])
+        return torch.mean((probabilities - one_hot_targets) ** 2)
+
+# --- Gating Network Definition ---
+class GatingNetwork(nn.Module):
+    def __init__(self, input_dim, num_models, hidden_dim=128):
+        super(GatingNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim), nn.BatchNorm1d(hidden_dim), nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(hidden_dim, hidden_dim // 2), nn.BatchNorm1d(hidden_dim // 2), nn.ReLU(),
+            nn.Linear(hidden_dim // 2, num_models)
+        )
+    def forward(self, x):
+        return self.network(x)
+
+# --- Train Gating Network ---
+def train_gating_network(cfg, frozen_models, gating_net, train_loader, val_loader, train_feature_store, train_dynamics_store):
+    """Trains the Gating Network using the integrated features."""
+    print("\n--- Phase 2: Training Gating Network ---")
+    gating_optimizer = optim.Adam(gating_net.parameters(), lr=1e-3, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(gating_optimizer, step_size=5, gamma=0.1)
+    classification_criterion = nn.CrossEntropyLoss()
+    calibration_criterion = BrierScoreLoss()
+    
+    for model in frozen_models:
+        model.to(cfg.DEVICE).eval()
+    gating_net.to(cfg.DEVICE)
+    best_val_loss = float('inf')
+
+    for epoch in range(5):
+        gating_net.train()
+        for inputs, labels, _ in tqdm(train_loader, desc=f"Gating Train Epoch {epoch+1}"):
+            inputs, labels = inputs.to(cfg.DEVICE), labels.to(cfg.DEVICE)
+            gating_optimizer.zero_grad()
+
+            with torch.no_grad():
+                ensemble_logits = [model(inputs) for model in frozen_models]
+                test_features = frozen_models[0].get_features(inputs)
+
+            gating_features = compute_gating_features_integrated(ensemble_logits, frozen_models, inputs, test_features, train_feature_store, train_dynamics_store, cfg.DEVICE)
+            weight_logits = gating_net(gating_features)
+            weights = torch.softmax(weight_logits, dim=1)
+
+            stacked_logits = torch.stack(ensemble_logits, dim=1)
+            weighted_logits = torch.bmm(weights.unsqueeze(1), stacked_logits).squeeze(1)
+            
+            loss_ce = classification_criterion(weighted_logits, labels)
+            loss_cal = calibration_criterion(torch.softmax(weighted_logits, dim=1), labels)
+            loss_reg = torch.mean(torch.sum(weights**2, dim=1))
+            
+            total_loss = loss_ce + 0.5 * loss_cal + 0.1 * loss_reg
+            total_loss.backward()
+            gating_optimizer.step()
+
+        # Validation for Gating Network
+        gating_net.eval()
+        val_loss, val_correct, val_total = 0, 0, 0
+        with torch.no_grad():
+            for inputs, labels, _ in val_loader:
+                inputs, labels = inputs.to(cfg.DEVICE), labels.to(cfg.DEVICE)
+                ensemble_logits = [model(inputs) for model in frozen_models]
+                test_features = frozen_models[0].get_features(inputs)
+                gating_features = compute_gating_features_integrated(ensemble_logits, frozen_models, inputs, test_features, train_feature_store, train_dynamics_store, cfg.DEVICE)
+                weights = torch.softmax(gating_net(gating_features), dim=1)
+                stacked_logits = torch.stack(ensemble_logits, dim=1)
+                weighted_logits = torch.bmm(weights.unsqueeze(1), stacked_logits).squeeze(1)
+                val_loss += classification_criterion(weighted_logits, labels).item() * inputs.size(0)
+                _, predicted = torch.max(weighted_logits.data, 1)
+                val_total += labels.size(0)
+                val_correct += (predicted == labels).sum().item()
+        
+        val_loss /= len(val_loader.dataset)
+        val_acc = val_correct / val_total
+        print(f"Epoch {epoch+1} Gating Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+        scheduler.step()
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(gating_net.state_dict(), os.path.join(cfg.MODEL_SAVE_DIR, 'best_gating_network.pth'))
+            print(f"Saved Best Gating Network with Val Loss: {best_val_loss:.4f}")
+            
+    return gating_net
+
+# --- Get Predictions with Gating ---
+def get_predictions_with_gating(cfg, data_loader, frozen_models, gating_net, train_feature_store, train_dynamics_store):
+    """Gets final predictions and confidences using the trained Gating Network."""
+    gating_net.eval()
+    for model in frozen_models:
+        model.eval()
+
+    all_predictions, all_confidences, all_labels = [], [], []
+    with torch.no_grad():
+        for inputs, labels, _ in tqdm(data_loader, desc="Gating Inference"):
+            inputs, labels = inputs.to(cfg.DEVICE), labels.to(cfg.DEVICE)
+            ensemble_logits = [model(inputs) for model in frozen_models]
+            test_features = frozen_models[0].get_features(inputs)
+            gating_features = compute_gating_features_integrated(ensemble_logits, frozen_models, inputs, test_features, train_feature_store, train_dynamics_store, cfg.DEVICE)
+            weights = torch.softmax(gating_net(gating_features), dim=1)
+            stacked_logits = torch.stack(ensemble_logits, dim=1)
+            weighted_logits = torch.bmm(weights.unsqueeze(1), stacked_logits).squeeze(1)
+            probs = torch.softmax(weighted_logits, dim=1)
+            confidences, predictions = torch.max(probs, 1)
+
+            all_predictions.extend(predictions.cpu().numpy())
+            all_confidences.extend(confidences.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            
+    return np.array(all_predictions), np.array(all_confidences), np.array(all_labels)
+
+# --- Metrics Calculation Functions ---
+def calculate_ece(preds, confs, labels, n_bins=10):
+    if len(confs) == 0:
+        return 0.0
+    bin_boundaries = np.linspace(0, 1, n_bins + 1)
+    bin_lowers, bin_uppers = bin_boundaries[:-1], bin_boundaries[1:]
+    ece = 0.0
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        in_bin = (confs > bin_lower) & (confs <= bin_upper)
+        if in_bin.mean() > 0:
+            accuracy_in_bin = (preds[in_bin] == labels[in_bin]).mean()
+            avg_confidence_in_bin = confs[in_bin].mean()
+            ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * in_bin.mean()
+    return ece
+
+def find_optimal_rejection_threshold_1(confs, preds, labels, cfg):
+    thresholds = np.linspace(0.0, 1.0, 1000)
+    best_threshold, min_deviation = 0.0, float('inf')
+    
+    for threshold in tqdm(thresholds, desc="Finding Optimal Threshold"):
+        accepted_mask = confs >= threshold
+        num_accepted = accepted_mask.sum()
+        
+        if num_accepted == 0:
+            continue
+            
+        acc_accepted = accuracy_score(labels[accepted_mask], preds[accepted_mask])
+        rej_rate = 1.0 - (num_accepted / len(labels))
+        ece_accepted = calculate_ece(preds[accepted_mask], confs[accepted_mask], labels[accepted_mask])
+        
+        acc_dev = max(0, cfg.TARGET_ACCEPTED_ACCURACY - acc_accepted) * cfg.ACCURACY_DEVIATION_WEIGHT
+        rej_dev = abs(rej_rate - cfg.TARGET_REJECTION_RATE) * cfg.REJECTION_RATE_DEVIATION_WEIGHT
+        ece_dev = ece_accepted * cfg.ECE_DEVIATION_WEIGHT
+        deviation = acc_dev + rej_dev + ece_dev
+        
+        if deviation < min_deviation:
+            min_deviation = deviation
+            best_threshold = threshold
+            
+    return best_threshold
+
+def calculate_metrics_1(preds, confs, labels, threshold):
+    accepted_mask = confs >= threshold
+    rejected_mask = ~accepted_mask
+    
+    overall_acc = accuracy_score(labels, preds)
+    coverage = accepted_mask.mean()
+    acc_accepted = accuracy_score(labels[accepted_mask], preds[accepted_mask]) if coverage > 0 else 0.0
+    is_correct = (preds == labels).astype(int)
+    is_rejected = rejected_mask.astype(int)
+    is_incorrect = (preds != labels).astype(int)
+    
+    fpr, tpr, _ = roc_curve(is_correct, confs)
+    auroc = auc(fpr, tpr)
+    f1 = f1_score(is_incorrect, is_rejected)
+    
+    metrics = {
+        'Overall Accuracy': overall_acc,
+        'Accuracy on Accepted': acc_accepted,
+        'Coverage': coverage,
+        'Rejection Rate': 1.0 - coverage,
+        'AUROC (Correctness)': auroc,
+        'F1 (Rejection)': f1
+    }
+    return metrics
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Run selective classification on medical imaging datasets.')
     parser.add_argument('--dataset', type=str, default='covidqu_xray',
@@ -2532,7 +2728,7 @@ def download_and_extract_dataset(dataset_config):
 
 if __name__ == "__main__":   
     multiprocessing.freeze_support() 
-    print("🚀 Train 1 Ensemble duy nhất rồi đánh giá các baseline")
+    print("🚀 Train 1 Ensemble only then evaluate baselines")
     cfg = Config()
     args = parse_args()
     selected_dataset = args.dataset
@@ -2545,7 +2741,7 @@ if __name__ == "__main__":
     cfg.LABEL_SMOOTHING_ENABLE = True
     cfg.ENABLE_TRAINING_DYNAMICS = True
 
-    # Tải dữ liệu
+    # Load data
     train_loader, val_loader, test_loader, train_dataset, val_dataset, test_dataset = prepare_datasets(cfg, selected_dataset)
 
     # Train
@@ -2627,3 +2823,80 @@ if __name__ == "__main__":
             'enable_training_dynamics': True # Bật phân tích động lực huấn luyện
         }
     ]
+
+    for idx, baseline_config in enumerate(baselines_to_run):
+        print(f"\n🔄 [{idx+1}/{len(baselines_to_run)}] Running {baseline_config['config_name']}")
+        
+        # Call `run_baseline` function with trained models and specific configuration
+        result = run_baseline(
+            config_name=baseline_config['config_name'],
+            # train_loader=train_loader, # Still needed for training dynamics feature extraction
+            # val_loader=val_loader,
+            # test_loader=test_loader,
+            # train_dataset=train_dataset, # Still needed for training dynamics feature extraction
+            final_overall_learning_metrics = overall_learning_metrics,
+            mcdo_enable=baseline_config['mcdo_enable'],
+            calibration_method=baseline_config['calibration_method'],
+            ood_detection_method=baseline_config['ood_detection_method'],
+            combine_ood_with_disagreement=baseline_config['combine_ood_with_disagreement'],
+            enable_training_dynamics=baseline_config['enable_training_dynamics'],
+            label_smoothing_enable= False
+        )
+        all_baseline_results.append(result)
+        print(f"✅ [{idx+1}/{len(baselines_to_run)}] Completed {baseline_config['config_name']}")
+
+    print("\n🎉 COMPLETED ALL BASELINES!")
+    print("="*80)
+
+    frozen_ensemble_models = []
+    for i in range(cfg.NUM_ENSEMBLE_MODELS):
+        model = BaseClassifier(num_classes=2).to(cfg.DEVICE)
+        model.load_state_dict(torch.load(os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{i}.pth')))  # Tải trọng số tốt nhất
+        for param in model.parameters():
+            param.requires_grad = False  # Đóng băng mô hình
+        frozen_ensemble_models.append(model)
+
+    print("\n--- Creating Feature Store and Training Dynamics ---")
+    train_features_list, train_indices_list = [], []
+    with torch.no_grad():
+        for inputs, _, indices in tqdm(train_loader, desc="Extracting Training Features"):
+            inputs = inputs.to(cfg.DEVICE)
+            features = frozen_ensemble_models[0].get_features(inputs).cpu().numpy()
+            train_features_list.append(features)
+            train_indices_list.extend(indices.cpu().numpy())
+
+    train_feature_store = {'features': np.vstack(train_features_list), 'indices': np.array(train_indices_list)}
+
+    train_dynamics_list = []
+    sorted_indices = train_feature_store['indices']
+    for idx in sorted_indices:
+        metrics = overall_learning_metrics.get(idx, {
+            'mean_first_correct_epoch': cfg.NUM_EPOCHS_PER_MODEL,
+            'mean_consistency': 0.0
+        })
+        train_dynamics_list.append([metrics['mean_first_correct_epoch'], metrics['mean_consistency']])
+
+    train_dynamics_store = np.array(train_dynamics_list)
+
+    print("\n--- Phase 2: Training Gating Network ---")
+    input_dim = cfg.NUM_ENSEMBLE_MODELS * (2 + 1 + 1 + 1) + 2  # logits + entropy + margin + grad_norm + dynamics
+    gating_net = GatingNetwork(input_dim=input_dim, num_models=cfg.NUM_ENSEMBLE_MODELS).to(cfg.DEVICE)
+    gating_net = train_gating_network(cfg, frozen_ensemble_models, gating_net, train_loader, val_loader, train_feature_store, train_dynamics_store)
+
+    gating_net.load_state_dict(torch.load(os.path.join(cfg.MODEL_SAVE_DIR, 'best_gating_network.pth')))
+
+    # Find optimal threshold on validation set
+    val_preds, val_confs, val_labels = get_predictions_with_gating(cfg, val_loader, frozen_ensemble_models, gating_net, train_feature_store, train_dynamics_store)
+    best_threshold = find_optimal_rejection_threshold_1(val_confs, val_preds, val_labels, cfg)
+    print(f"\nFinal Optimal Rejection Threshold: {best_threshold:.4f}")
+
+    # Final evaluation on the test set
+    print("\n--- Final Evaluation on Test Set ---")
+    test_preds, test_confs, test_labels = get_predictions_with_gating(cfg, test_loader, frozen_ensemble_models, gating_net, train_feature_store, train_dynamics_store)
+    test_metrics = calculate_metrics_1(test_preds, test_confs, test_labels, best_threshold)
+
+    print("\n--- Test Set Performance Summary ---")
+    for metric, value in test_metrics.items():
+        print(f"{metric}: {value:.4f}")
+
+    print("\n--- FULL PIPELINE COMPLETED ---")
