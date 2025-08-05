@@ -240,7 +240,7 @@ def set_seed(seed):
 
 set_seed(cfg.RANDOM_SEED)
 
-print(f"Using device: {cfg.DEVICE}")
+# print(f"Using device: {cfg.DEVICE}")
 
 # --- 1. Data Loading and Preprocessing ---
 class CTScanDataset(Dataset):
@@ -575,15 +575,15 @@ class LabelSmoothingLoss(nn.Module):
             true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
         return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
 
-# --- 3. Hàm huấn luyện cho các thành viên Ensemble với theo dõi động lực huấn luyện ---
+# --- 3. Training function for Ensemble members with training dynamics tracking ---
 def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, cfg):
     """
-    Huấn luyện một thể hiện duy nhất của bộ phân loại cơ bản và theo dõi động lực huấn luyện chi tiết
-    (nhãn dự đoán và độ tin cậy cho mỗi mẫu ở mỗi epoch).
+    Train a single instance of the base classifier and track detailed training dynamics
+    (predicted labels and confidence for each sample at each epoch).
     """
     if cfg.LABEL_SMOOTHING_ENABLE:
         criterion = LabelSmoothingLoss(classes=2, epsilon=cfg.LABEL_SMOOTHING_EPSILON).to(device)
-        print(f"Đã bật Label Smoothing với epsilon: {cfg.LABEL_SMOOTHING_EPSILON}")
+        print(f"Turn on Label Smoothing với epsilon: {cfg.LABEL_SMOOTHING_EPSILON}")
     else:
         criterion = nn.CrossEntropyLoss().to(device)
 
@@ -593,14 +593,14 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
     model.to(device)
     best_val_accuracy = 0.0
     
-    # Từ điển để lưu trữ lịch sử dự đoán chi tiết cho mỗi mẫu huấn luyện qua các epoch
-    # Key: global_idx của mẫu, Value: Danh sách các dict, mỗi dict (epoch, is_correct, predicted_label, confidence)
+    # Dictionary to store detailed prediction history for each training sample across epochs
+    # Key: global_idx of sample, Value: List of dicts, each dict (epoch, is_correct, predicted_label, confidence)
     training_prediction_details = {global_idx: [] for global_idx in train_loader.dataset.global_indices}
 
 
-    print(f"\n--- Huấn luyện Mô hình Ensemble {model_idx + 1} ---")
+    print(f"\n--- Training Model Ensemble {model_idx + 1} ---")
     for epoch in range(epochs):
-        model.train() # Đảm bảo mô hình ở chế độ train (dropout hoạt động nếu có)
+        model.train() # Ensure model is in train mode (dropout active if enabled)
         running_loss = 0.0
         correct_predictions = 0
         total_samples = 0
@@ -616,7 +616,6 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
 
             running_loss += loss.item() * inputs.size(0)
             
-            # Tách các outputs trước khi chuyển đổi sang numpy
             probs = softmax(outputs.detach().cpu().numpy(), axis=1) 
             predicted_labels = np.argmax(probs, axis=1)
             confidences_batch = np.max(probs, axis=1)
@@ -625,7 +624,7 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
             correct_in_batch = (predicted_labels == labels.cpu().numpy()).sum().item()
             correct_predictions += correct_in_batch
 
-            # Cập nhật động lực huấn luyện: lưu nhãn dự đoán và độ tin cậy của nó cho mỗi mẫu ở epoch này
+            # Update training dynamics: save predicted label and its confidence for each sample at this epoch
             for i, global_idx_tensor in enumerate(global_indices_batch):
                 global_idx = global_idx_tensor.item()
                 is_correct_prediction = (predicted_labels[i] == labels[i].item())
@@ -644,7 +643,7 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
         epoch_accuracy = correct_predictions / total_samples
 
         # Giai đoạn Validation
-        model.eval() # Đặt mô hình về chế độ eval cho validation
+        model.eval() # Set model to eval mode for validation
         val_correct_predictions = 0
         val_total_samples = 0
         val_loss = 0.0
@@ -665,23 +664,22 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
 
         scheduler.step()
 
-        # Lưu mô hình tốt nhất dựa trên độ chính xác validation
+        # Save best model based on validation accuracy
         if val_accuracy > best_val_accuracy:
             best_val_accuracy = val_accuracy
             torch.save(model.state_dict(), os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{model_idx}.pth'))
-            print(f"Đã lưu mô hình tốt nhất {model_idx + 1} với Val Acc: {best_val_accuracy:.4f}")
+            print(f"Saved best model {model_idx + 1} with Val Acc: {best_val_accuracy:.4f}")
 
-    print(f"Hoàn thành huấn luyện Mô hình {model_idx + 1}. Val Acc tốt nhất: {best_val_accuracy:.4f}")
+    print(f"Completed training Model {model_idx + 1}. Best Val Acc: {best_val_accuracy:.4f}")
     
-    # Sau tất cả các epoch cho mô hình này, tính toán 'learning metrics' cho mỗi mẫu
+    # After all epochs for this model, calculate 'learning metrics' for each sample
     sample_learning_metrics = {}
     for global_idx, history in training_prediction_details.items():
         correct_epochs_history = [h for h in history if h['is_correct']]
         
         avg_correct_confidence = np.mean([h['confidence'] for h in correct_epochs_history]) if correct_epochs_history else 0.0
         
-        # Sự chậm trễ trong học tập: epoch đầu tiên mà nó đúng và vẫn đúng cho tất cả các epoch tiếp theo
-        first_correct_epoch = epochs # Mặc định là 'chưa bao giờ học thực sự' (max epochs)
+        first_correct_epoch = epochs 
         for k_idx in range(len(history)): 
             if history[k_idx]['is_correct']:
                 # Kiểm tra xem nó có giữ đúng cho đến cuối không
@@ -689,132 +687,7 @@ def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, 
                     first_correct_epoch = history[k_idx]['epoch']
                     break
         
-        # Tính nhất quán: tỷ lệ dự đoán đúng trên tất cả các epoch cho mô hình này
-        consistency = len(correct_epochs_history) / epochs if epochs > 0 else 0.0
-
-        sample_learning_metrics[global_idx] = {
-            'avg_correct_confidence': avg_correct_confidence,
-            'first_correct_epoch': first_correct_epoch,
-            'consistency': consistency
-        }
-    
-    return sample_learning_metrics
-
-# --- 3. Hàm huấn luyện cho các thành viên Ensemble với theo dõi động lực huấn luyện ---
-def train_model(model, train_loader, val_loader, epochs, lr, device, model_idx, cfg):
-    """
-    Huấn luyện một thể hiện duy nhất của bộ phân loại cơ bản và theo dõi động lực huấn luyện chi tiết
-    (nhãn dự đoán và độ tin cậy cho mỗi mẫu ở mỗi epoch).
-    """
-    if cfg.LABEL_SMOOTHING_ENABLE:
-        criterion = LabelSmoothingLoss(classes=2, epsilon=cfg.LABEL_SMOOTHING_EPSILON).to(device)
-        print(f"Đã bật Label Smoothing với epsilon: {cfg.LABEL_SMOOTHING_EPSILON}")
-    else:
-        criterion = nn.CrossEntropyLoss().to(device)
-
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.5)
-
-    model.to(device)
-    best_val_accuracy = 0.0
-    
-    # Từ điển để lưu trữ lịch sử dự đoán chi tiết cho mỗi mẫu huấn luyện qua các epoch
-    # Key: global_idx của mẫu, Value: Danh sách các dict, mỗi dict (epoch, is_correct, predicted_label, confidence)
-    training_prediction_details = {global_idx: [] for global_idx in train_loader.dataset.global_indices}
-
-
-    print(f"\n--- Huấn luyện Mô hình Ensemble {model_idx + 1} ---")
-    for epoch in range(epochs):
-        model.train() # Đảm bảo mô hình ở chế độ train (dropout hoạt động nếu có)
-        running_loss = 0.0
-        correct_predictions = 0
-        total_samples = 0
-
-        for inputs, labels, global_indices_batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} (Train)", dynamic_ncols=True):
-            inputs, labels = inputs.to(device), labels.to(device)
-
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item() * inputs.size(0)
-            
-            # Tách các outputs trước khi chuyển đổi sang numpy
-            probs = softmax(outputs.detach().cpu().numpy(), axis=1) 
-            predicted_labels = np.argmax(probs, axis=1)
-            confidences_batch = np.max(probs, axis=1)
-
-            total_samples += labels.size(0)
-            correct_in_batch = (predicted_labels == labels.cpu().numpy()).sum().item()
-            correct_predictions += correct_in_batch
-
-            # Cập nhật động lực huấn luyện: lưu nhãn dự đoán và độ tin cậy của nó cho mỗi mẫu ở epoch này
-            for i, global_idx_tensor in enumerate(global_indices_batch):
-                global_idx = global_idx_tensor.item()
-                is_correct_prediction = (predicted_labels[i] == labels[i].item())
-                training_prediction_details[global_idx].append({
-                    'epoch': epoch,
-                    'is_correct': is_correct_prediction,
-                    'predicted_label': predicted_labels[i],
-                    'confidence': confidences_batch[i]
-                })
-        
-        # Clear CUDA cache after each epoch to free up memory
-        if device.type == 'cuda':
-            torch.cuda.empty_cache()
-
-        epoch_loss = running_loss / total_samples
-        epoch_accuracy = correct_predictions / total_samples
-
-        # Giai đoạn Validation
-        model.eval() # Đặt mô hình về chế độ eval cho validation
-        val_correct_predictions = 0
-        val_total_samples = 0
-        val_loss = 0.0
-        with torch.no_grad():
-            for inputs, labels, _ in val_loader: # Không cần global_indices trong val_loader cho bước validation
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model(inputs)
-                val_loss += criterion(outputs, labels).item() * inputs.size(0)
-                _, predicted = torch.max(outputs.data, 1)
-                val_total_samples += labels.size(0)
-                val_correct_predictions += (predicted == labels).sum().item()
-
-        val_accuracy = val_correct_predictions / val_total_samples
-        val_loss /= val_total_samples
-
-        print(f"Epoch {epoch+1}: Train Loss: {epoch_loss:.4f}, Train Acc: {epoch_accuracy:.4f}, "
-              f"Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}")
-
-        scheduler.step()
-
-        # Lưu mô hình tốt nhất dựa trên độ chính xác validation
-        if val_accuracy > best_val_accuracy:
-            best_val_accuracy = val_accuracy
-            torch.save(model.state_dict(), os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{model_idx}.pth'))
-            print(f"Đã lưu mô hình tốt nhất {model_idx + 1} với Val Acc: {best_val_accuracy:.4f}")
-
-    print(f"Hoàn thành huấn luyện Mô hình {model_idx + 1}. Val Acc tốt nhất: {best_val_accuracy:.4f}")
-    
-    # Sau tất cả các epoch cho mô hình này, tính toán 'learning metrics' cho mỗi mẫu
-    sample_learning_metrics = {}
-    for global_idx, history in training_prediction_details.items():
-        correct_epochs_history = [h for h in history if h['is_correct']]
-        
-        avg_correct_confidence = np.mean([h['confidence'] for h in correct_epochs_history]) if correct_epochs_history else 0.0
-        
-        # Sự chậm trễ trong học tập: epoch đầu tiên mà nó đúng và vẫn đúng cho tất cả các epoch tiếp theo
-        first_correct_epoch = epochs # Mặc định là 'chưa bao giờ học thực sự' (max epochs)
-        for k_idx in range(len(history)): 
-            if history[k_idx]['is_correct']:
-                # Kiểm tra xem nó có giữ đúng cho đến cuối không
-                if all(h_sub['is_correct'] for h_sub in history[k_idx:]):
-                    first_correct_epoch = history[k_idx]['epoch']
-                    break
-        
-        # Tính nhất quán: tỷ lệ dự đoán đúng trên tất cả các epoch cho mô hình này
+        # Consistency: ratio of correct predictions across all epochs for this model
         consistency = len(correct_epochs_history) / epochs if epochs > 0 else 0.0
 
         sample_learning_metrics[global_idx] = {
@@ -1024,78 +897,77 @@ def adjust_confidence_with_training_dynamics(cfg, test_features, current_scores,
 
     similarities = cosine_similarity(test_features, train_features)
     
-    for i in tqdm(range(len(test_features)), desc="Áp dụng điều chỉnh động lực huấn luyện", dynamic_ncols=True):
-        # Tìm mẫu huấn luyện tương đồng nhất (bằng chỉ mục của nó trong mảng `train_features`)
+    for i in tqdm(range(len(test_features)), desc="Applying training dynamics adjustment", dynamic_ncols=True):
+        # Find most similar training sample (by its index in `train_features` array)
         most_similar_train_idx_in_features_array = np.argmax(similarities[i])
-        # Lấy chỉ mục toàn cục gốc của mẫu huấn luyện tương đồng nhất đó
+        # Get original global index of that most similar training sample
         most_similar_train_global_idx = train_global_indices[most_similar_train_idx_in_features_array]
         
-        # Kiểm tra xem các learning metrics cho chỉ mục toàn cục này có tồn tại không
+        # Check if learning metrics exist for this global index
         if most_similar_train_global_idx in train_global_idx_to_metrics:
             sample_metrics = train_global_idx_to_metrics[most_similar_train_global_idx]
             
-            # Sử dụng 'mean_first_correct_epoch' làm proxy cho 'learning lateness' hoặc 'difficulty'.
-            # 'mean_first_epoch' cao hơn cho thấy một mẫu khó học hơn.
-            # Sử dụng .get() với giá trị mặc định trong trường hợp key bị thiếu bất ngờ
+            # Use 'mean_first_correct_epoch' as proxy for 'learning lateness' or 'difficulty'.
+            # Higher 'mean_first_epoch' indicates a harder-to-learn sample.
+            # Use .get() with default value in case key is unexpectedly missing
             difficulty_value = sample_metrics.get('mean_first_correct_epoch', cfg.NUM_EPOCHS_PER_MODEL)
             
-            # Chuẩn hóa độ khó nằm giữa 0 và 1 (0 = dễ, 1 = khó).
-            # Nếu một mẫu được học muộn (epoch cao hơn), nó khó hơn, vì vậy độ khó chuẩn hóa gần 1.
+            # Normalize difficulty between 0 and 1 (0 = easy, 1 = hard).
+            # If a sample was learned late (higher epoch), it's harder, so normalized difficulty is closer to 1.
             if cfg.NUM_EPOCHS_PER_MODEL > 0:
                 normalized_difficulty = difficulty_value / cfg.NUM_EPOCHS_PER_MODEL
             else:
-                normalized_difficulty = 0.0 # Mặc định nếu không có epoch nào được định nghĩa (hoặc 0.5 cho trung tính)
+                normalized_difficulty = 0.0 # Default if no epochs defined (or 0.5 for neutral)
 
 
         else:
-            # Nếu không tìm thấy chỉ mục (ví dụ: một mẫu huấn luyện bằng cách nào đó bị bỏ lỡ trong quá trình theo dõi),
-            # mặc định không có hình phạt (độ khó trung tính).
+            # If index not found (e.g., a training sample somehow missed during tracking),
+            # default to no penalty (neutral difficulty).
             normalized_difficulty = 0.0 
 
-        # Giảm điểm dựa trên độ khó và một yếu tố hình phạt có thể điều chỉnh (cfg.TRAINING_DYNAMICS_CONF_PENALTY)
-        # Độ khó cao hơn dẫn đến giảm điểm lớn hơn
+        # Reduce score based on difficulty and an adjustable penalty factor (cfg.TRAINING_DYNAMICS_CONF_PENALTY)
+        # Higher difficulty leads to greater score reduction
         adjustment_factor = 1.0 - (cfg.TRAINING_DYNAMICS_CONF_PENALTY * normalized_difficulty)
         
         adjusted_scores[i] *= adjustment_factor
-        adjusted_scores[i] = max(0.0, adjusted_scores[i]) # Đảm bảo điểm không âm
+        adjusted_scores[i] = max(0.0, adjusted_scores[i]) # Ensure score is non-negative
 
     return adjusted_scores
 def calculate_single_model_odin_score(model, inputs, temp, epsilon, device):
     """
-    Tính toán điểm ODIN cho đầu vào batch trên một mô hình duy nhất.
-    Trả về điểm ODIN (numpy array), điểm cao hơn nghĩa là trong phân phối hơn.
+    Calculate ODIN score for batch input on a single model.
+    Returns ODIN score (numpy array), higher score means more in-distribution.
     """
-    # Đảm bảo inputs có thể tính toán gradient
+    # Ensure inputs can compute gradients
     inputs.requires_grad_(True)
     
-    # Đặt mô hình ở chế độ đánh giá
+    # Set model to evaluation mode
     model.eval() 
     
-    # Forward pass để lấy logits
+    # Forward pass to get logits
     outputs = model(inputs)
     
-    # Áp dụng nhiệt độ cho logits
+    # Apply temperature to logits
     temp_outputs = outputs / temp
     
-    # Lấy lớp dự đoán cho việc nhiễu loạn
+    # Get predicted class for perturbation
     pred_class = temp_outputs.argmax(dim=1)
     
-    # Tính toán loss (negative log-likelihood) cho lớp dự đoán.
-    # Mục tiêu là tối đa hóa xác suất của lớp dự đoán này bằng cách nhiễu loạn đầu vào.
+            # Calculate loss (negative log-likelihood) for predicted class.
+        # Goal is to maximize probability of this predicted class by perturbing input.
     loss = F.cross_entropy(temp_outputs, pred_class)
     
-    # Tính toán gradient của loss đối với đầu vào
-    # create_graph=False để không xây dựng biểu đồ cho các lần backward tiếp theo
+            # Calculate gradient of loss with respect to input
+        # create_graph=False to avoid building graph for subsequent backward passes
     grad = torch.autograd.grad(loss, inputs, create_graph=False)[0] 
     
-    # Tạo đầu vào bị nhiễu loạn
     perturbed_inputs = inputs - epsilon * torch.sign(-grad)
     
-    # Chuyển đầu vào bị nhiễu loạn qua mô hình một lần nữa
-    with torch.no_grad(): # Không cần gradient cho bước này
+            # Pass perturbed input through model again
+    with torch.no_grad(): # No gradient needed for this step
         perturbed_outputs = model(perturbed_inputs)
         
-    # Điểm ODIN là xác suất tối đa của đầu ra bị nhiễu loạn sau khi áp dụng nhiệt độ
+            # ODIN score is maximum probability of perturbed output after applying temperature
     odin_probs = F.softmax(perturbed_outputs / temp, dim=1)
     odin_score = torch.max(odin_probs, dim=1)[0]
     
@@ -1108,63 +980,63 @@ def get_rejection_scores_and_predictions(cfg, data_loader, ensemble_models_dir,
                                         ood_detection_method='none', # e.g., 'none', 'odin', 'energy'
                                         combine_ood_with_disagreement=False): # Controls B.1.2, B.2.2 vs B.1.1, B.2.1
     """
-    Tính toán điểm từ chối và dự đoán của ensemble cho các mẫu.
-    Tùy chọn tích hợp Monte Carlo Dropout (MCDO), các phương pháp hiệu chỉnh,
-    và các phương pháp phát hiện OOD (ODIN, Energy Score).
-    Áp dụng điều chỉnh dựa trên động lực huấn luyện nếu `cfg.ENABLE_TRAINING_DYNAMICS` là True.
+    Calculate rejection scores and ensemble predictions for samples.
+    Optionally integrates Monte Carlo Dropout (MCDO), calibration methods,
+    and OOD detection methods (ODIN, Energy Score).
+    Applies training dynamics adjustment if `cfg.ENABLE_TRAINING_DYNAMICS` is True.
 
-    Trả về:
-    - all_predictions: Các dự đoán ensemble cuối cùng
-    - final_rejection_scores: Điểm từ chối cuối cùng (cao hơn là được chấp nhận)
-    - all_labels: Nhãn thực
-    - all_original_indices: Các chỉ mục toàn cục gốc của các mẫu
-    - all_ensemble_individual_probs_stacked: Mảng NumPy (num_samples, total_runs_or_models, num_classes) của các xác suất mô hình riêng lẻ/chạy MCDO.
-    - all_odin_scores_raw: Điểm ODIN thô cho mỗi mẫu (None nếu không áp dụng)
-    - all_energy_scores_raw: Điểm Energy thô cho mỗi mẫu (None nếu không áp dụng)
+    Returns:
+    - all_predictions: Final ensemble predictions
+    - final_rejection_scores: Final rejection scores (higher means accepted)
+    - all_labels: True labels
+    - all_original_indices: Original global indices of samples
+    - all_ensemble_individual_probs_stacked: NumPy array (num_samples, total_runs_or_models, num_classes) of individual model/MCDO run probabilities.
+    - all_odin_scores_raw: Raw ODIN scores for each sample (None if not applied)
+    - all_energy_scores_raw: Raw Energy scores for each sample (None if not applied)
     """
     all_predictions = []
     all_labels = []
     all_original_indices = []
     
-    all_calibrated_confidences = [] # Điểm tin cậy sau hiệu chỉnh, trước bất đồng/OOD
+    all_calibrated_confidences = [] # Confidence scores after calibration, before disagreement/OOD
     
-    all_individual_run_probs_across_batches_if_mcdo_enabled = [] # Để tính toán bất đồng
-    all_odin_scores_across_batches = [] # Điểm ODIN trung bình cho mỗi mẫu
-    all_energy_scores_across_batches = [] # Điểm Energy cho mỗi mẫu
+    all_individual_run_probs_across_batches_if_mcdo_enabled = [] # For calculating disagreement
+    all_odin_scores_across_batches = [] # Average ODIN scores for each sample
+    all_energy_scores_across_batches = [] # Energy scores for each sample
 
-    # Tải tất cả các mô hình ensemble
+    # Load all ensemble models
     loaded_models = []
     for i in range(cfg.NUM_ENSEMBLE_MODELS):
         model = BaseClassifier(num_classes=2, dropout_rate=(cfg.MCDO_DROPOUT_RATE if cfg.MCDO_ENABLE else 0.0)).to(cfg.DEVICE)
         model.load_state_dict(torch.load(os.path.join(ensemble_models_dir, f'best_model_ensemble_{i}.pth')))
-        model.eval() # Luôn ở chế độ eval cho inference khi không dùng MCDO, nhưng sẽ bật dropout nếu MCDO_ENABLE
+        model.eval() # Always in eval mode for inference when not using MCDO, but will enable dropout if MCDO_ENABLE
         loaded_models.append(model)
     
     # Clear CUDA cache before starting inference/calibration to ensure maximum free memory
     if cfg.DEVICE.type == 'cuda':
         torch.cuda.empty_cache()
-            # Khởi tạo bộ hiệu chỉnh
+            # Initialize calibrator
     calibrator = None
     if calibration_method == 'temperature_scaling':
         calibrator = TemperatureScaler()
         calibrator.to(cfg.DEVICE)
-        print("Sử dụng Temperature Scaling để hiệu chỉnh.")
+        print("Using Temperature Scaling for calibration.")
     elif calibration_method == 'isotonic_regression':
         calibrator = IsotonicCalibrator()
-        print("Sử dụng Isotonic Regression để hiệu chỉnh.")
+        print("Using Isotonic Regression for calibration.")
     elif calibration_method == 'beta_calibration':
         calibrator = BetaCalibrator()
-        print("Sử dụng Beta Calibration để hiệu chỉnh.")
+        print("Using Beta Calibration for calibration.")
     else:
-        print("Không sử dụng hiệu chỉnh post-hoc (hoặc phương pháp không hợp lệ).")
+        print("No post-hoc calibration used (or invalid method).")
 
-    print(f"Hiệu chỉnh bộ hiệu chỉnh ({calibration_method}) trên các logits/xác suất trung bình của ensemble từ data_loader hiện tại...")
-    # --- Thu thập tất cả các logits/confidences/labels từ data_loader hiện tại để hiệu chỉnh ---
-    data_loader_ensemble_raw_outputs = [] # Logits hoặc xác suất trung bình
+    print(f"Calibrating calibrator ({calibration_method}) on ensemble average logits/probabilities from current data_loader...")
+    # --- Collect all logits/confidences/labels from current data_loader for calibration ---
+    data_loader_ensemble_raw_outputs = [] # Average logits or probabilities
     data_loader_labels_for_calibration = []
 
     with torch.no_grad():
-        for inputs_batch_cal, labels_batch_cal, _ in tqdm(data_loader, desc="Thu thập Dữ liệu để hiệu chỉnh", dynamic_ncols=True):
+        for inputs_batch_cal, labels_batch_cal, _ in tqdm(data_loader, desc="Collecting Data for Calibration", dynamic_ncols=True):
             inputs_batch_cal = inputs_batch_cal.to(cfg.DEVICE)
             
             ensemble_logits_batch_cal = []
@@ -1201,15 +1073,15 @@ def get_rejection_scores_and_predictions(cfg, data_loader, ensemble_models_dir,
             confidences_for_calibration = np.max(probs_for_calibration, axis=1)
             calibrator.calibrate(confidences_for_calibration, data_loader_labels_for_calibration_all.numpy())
     else:
-        print("Cảnh báo: Không có dữ liệu trong data_loader để hiệu chỉnh. Bỏ qua hiệu chỉnh post-hoc.")
+        print("Warning: No data in data_loader for calibration. Skipping post-hoc calibration.")
 
     # Clear CUDA cache after calibration
     if cfg.DEVICE.type == 'cuda':
         torch.cuda.empty_cache()
     
-    # Trích xuất đặc trưng từ data_loader hiện tại (tập val/test) để điều chỉnh động lực huấn luyện
-    print("Trích xuất đặc trưng từ trình tải dữ liệu hiện tại để điều chỉnh độ tin cậy...")
-    loaded_models[0].eval() # Đảm bảo mô hình ở chế độ eval khi trích xuất đặc trưng
+    # Extract features from current data_loader (val/test set) for training dynamics adjustment
+    print("Extracting features from current data loader for confidence adjustment...")
+    loaded_models[0].eval() # Ensure model is in eval mode when extracting features
     all_extracted_features, extracted_original_indices = extract_features(
         loaded_models[0], data_loader, cfg.DEVICE 
     )
@@ -1218,8 +1090,8 @@ def get_rejection_scores_and_predictions(cfg, data_loader, ensemble_models_dir,
     if cfg.DEVICE.type == 'cuda':
         torch.cuda.empty_cache()
 
-    print("Tạo dự đoán và các điểm từ chối...")
-    for inputs, labels, original_indices_batch in tqdm(data_loader, desc="Dự đoán và Tính điểm", dynamic_ncols=True):
+    print("Creating predictions and rejection scores...")
+    for inputs, labels, original_indices_batch in tqdm(data_loader, desc="Prediction and Scoring", dynamic_ncols=True):
         inputs, labels = inputs.to(cfg.DEVICE), labels.to(cfg.DEVICE)
 
         ensemble_logits_per_model = [] 
@@ -1421,7 +1293,7 @@ def get_rejection_scores_and_predictions(cfg, data_loader, ensemble_models_dir,
 # --- ECE Calculation ---
 def calculate_ece(model_predictions, rejection_scores, true_labels, num_bins=10):
     """
-    Tính toán Expected Calibration Error (ECE).
+    Calculate Expected Calibration Error (ECE).
     """
     if len(rejection_scores) == 0:
         return 0.0
@@ -1435,7 +1307,7 @@ def calculate_ece(model_predictions, rejection_scores, true_labels, num_bins=10)
         upper_bound = bins[i+1]
         # FIX: Added np.nan_to_num to handle potential NaNs from previous calculations before comparison
         mask = (np.nan_to_num(rejection_scores, nan=-np.inf) >= lower_bound) & (np.nan_to_num(rejection_scores, nan=-np.inf) < upper_bound)
-        if i == num_bins - 1: # Bao gồm 1.0 trong bin cuối cùng
+        if i == num_bins - 1: # Include 1.0 in the last bin
             mask = (np.nan_to_num(rejection_scores, nan=-np.inf) >= lower_bound) & (np.nan_to_num(rejection_scores, nan=-np.inf) <= upper_bound)
 
         bin_samples_indices = np.where(mask)[0]
@@ -1449,20 +1321,20 @@ def calculate_ece(model_predictions, rejection_scores, true_labels, num_bins=10)
 
 def find_optimal_rejection_threshold(rejection_scores, original_model_predictions, true_labels, cfg):
     """
-    Tìm ngưỡng độ tin cậy tối ưu trên tập validation
-    để đáp ứng độ chính xác mục tiêu trên các trường hợp được chấp nhận, tỷ lệ từ chối mục tiêu và tối ưu hóa ECE.
+    Find optimal confidence threshold on validation set
+    to meet target accuracy on accepted cases, target rejection rate, and optimize ECE.
     """
     thresholds = np.linspace(0.0, 1.0, 1000) 
     best_threshold = 0.0
     min_deviation = float('inf')
 
-    print("\n--- Tìm Ngưỡng Từ Chối Tối ưu trên Tập Validation ---")
+    print("\n--- Finding Optimal Rejection Threshold on Validation Set ---")
     results = []
     # FIX: Added np.nan_to_num to handle potential NaNs in rejection_scores before thresholding
     rejection_scores_clean = np.nan_to_num(rejection_scores, nan=-np.inf) # Treat NaN as low score (rejected)
 
-    for threshold in tqdm(thresholds, desc="Đánh giá ngưỡng", dynamic_ncols=True):
-        # `rejection_scores` là điểm thống nhất, điểm cao hơn nghĩa là được chấp nhận
+    for threshold in tqdm(thresholds, desc="Evaluating thresholds", dynamic_ncols=True):
+        # `rejection_scores` is a unified score, higher score means accepted
         accepted_indices = rejection_scores_clean >= threshold 
         
         num_total = len(true_labels)
@@ -1483,10 +1355,10 @@ def find_optimal_rejection_threshold(rejection_scores, original_model_prediction
             current_ece_on_accepted = calculate_ece(accepted_predictions, accepted_rejection_scores, accepted_true_labels)
 
 
-        # Tính độ lệch so với mục tiêu, sử dụng trọng số có thể cấu hình
+        # Calculate deviation from targets, using configurable weights
         accuracy_deviation = max(0, cfg.TARGET_ACCEPTED_ACCURACY - current_accuracy_on_accepted) * cfg.ACCURACY_DEVIATION_WEIGHT
         rejection_deviation = abs(current_rejection_rate - cfg.TARGET_REJECTION_RATE) * cfg.REJECTION_RATE_DEVIATION_WEIGHT
-        # Giảm thiểu ECE trên tập chấp nhận (ECE thấp hơn là tốt hơn)
+        # Minimize ECE on accepted set (lower ECE is better)
         ece_deviation = current_ece_on_accepted * cfg.ECE_DEVIATION_WEIGHT
 
         deviation = accuracy_deviation + rejection_deviation + ece_deviation
@@ -1500,23 +1372,23 @@ def find_optimal_rejection_threshold(rejection_scores, original_model_prediction
         })
 
     results_df = pd.DataFrame(results)
-    # Lọc các ngưỡng thực tế cung cấp một số độ phủ
+    # Filter thresholds that actually provide some coverage
     results_df = results_df[results_df['rejection_rate'] < 1.0]
 
     if not results_df.empty:
-        # Tìm hàng có tổng độ lệch tối thiểu
+        # Find row with minimum total deviation
         best_row_idx = results_df['deviation'].idxmin()
         best_threshold_info = results_df.loc[best_row_idx]
         best_threshold = best_threshold_info['threshold']
         min_deviation = best_threshold_info['deviation']
 
-        print(f"Tìm thấy ngưỡng tối ưu: {best_threshold:.4f}")
-        print(f"  Độ chính xác trên các trường hợp được chấp nhận: {best_threshold_info['accuracy_on_accepted']:.4f}")
-        print(f"  Tỷ lệ từ chối: {best_threshold_info['rejection_rate']:.4f}")
-        print(f"  ECE trên các trường hợp được chấp nhận: {best_threshold_info['ece_on_accepted']:.4f}")
-        print(f"  Tổng độ lệch: {best_threshold_info['deviation']:.4f}")
+        print(f"Found optimal threshold: {best_threshold:.4f}")
+        print(f"  Accuracy on accepted cases: {best_threshold_info['accuracy_on_accepted']:.4f}")
+        print(f"  Rejection rate: {best_threshold_info['rejection_rate']:.4f}")
+        print(f"  ECE on accepted cases: {best_threshold_info['ece_on_accepted']:.4f}")
+        print(f"  Total deviation: {best_threshold_info['deviation']:.4f}")
     else:
-        print("Không thể tìm thấy ngưỡng phù hợp, mặc định là 0.5. Vui lòng kiểm tra dữ liệu và mục tiêu cấu hình của bạn.")
+        print("Could not find suitable threshold, defaulting to 0.5. Please check your data and configuration targets.")
         best_threshold = 0.5
 
     return best_threshold, results_df
@@ -1524,8 +1396,8 @@ def find_optimal_rejection_threshold(rejection_scores, original_model_prediction
 # --- Metrics Đánh giá ---
 def calculate_metrics(model_predictions, rejection_scores, true_labels, rejection_threshold, verbose=True):
     """
-    Tính toán các chỉ số phân loại chọn lọc khác nhau.
-    `rejection_scores` là điểm thống nhất, điểm cao hơn nghĩa là được chấp nhận.
+    Calculate various selective classification metrics.
+    `rejection_scores` is a unified score, higher score means accepted.
     """
     accepted_indices = rejection_scores >= rejection_threshold
     rejected_indices = rejection_scores < rejection_threshold
@@ -1534,17 +1406,17 @@ def calculate_metrics(model_predictions, rejection_scores, true_labels, rejectio
     num_accepted = np.sum(accepted_indices)
     num_rejected = np.sum(rejected_indices)
 
-    # Độ phủ (Coverage)
+    # Coverage
     coverage = num_accepted / num_total
     rejection_rate = num_rejected / num_total
 
-    # Độ chính xác trên các Trường hợp được Chấp nhận (Rủi ro)
+    # Accuracy on Accepted Cases (Risk)
     if num_accepted > 0:
         accepted_predictions = model_predictions[accepted_indices]
         accepted_true_labels = true_labels[accepted_indices]
         accuracy_accepted = accuracy_score(accepted_true_labels, accepted_predictions)
         risk = 1.0 - accuracy_accepted
-        # NLL và Brier Score trên các mẫu được chấp nhận
+        # NLL and Brier Score on accepted samples
         all_possible_labels = np.unique(true_labels) # Get all unique labels from the original true_labels
         nll_accepted = log_loss(accepted_true_labels, rejection_scores[accepted_indices], labels=all_possible_labels)
         brier_accepted = brier_score_loss(accepted_true_labels, rejection_scores[accepted_indices])
@@ -1554,32 +1426,32 @@ def calculate_metrics(model_predictions, rejection_scores, true_labels, rejectio
         nll_accepted = np.nan
         brier_accepted = np.nan
 
-    # Độ chính xác tổng thể (để so sánh)
+    # Overall accuracy (for comparison)
     overall_accuracy = accuracy_score(true_labels, model_predictions)
 
     if verbose:
-        print(f"\n--- Kết quả Đánh giá (Ngưỡng={rejection_threshold:.4f}) ---")
-        print(f"Độ chính xác tổng thể (Tất cả các mẫu): {overall_accuracy:.4f}")
-        print(f"Độ phủ: {coverage:.4f} ({num_accepted} mẫu được chấp nhận)")
-        print(f"Tỷ lệ từ chối: {rejection_rate:.4f} ({num_rejected} mẫu bị từ chối)")
-        print(f"Độ chính xác trên các Trường hợp được chấp nhận: {accuracy_accepted:.4f}")
-        print(f"Rủi ro trên các Trường hợp được chấp nhận: {risk:.4f}")
+        print(f"\n--- Evaluation Results (Threshold={rejection_threshold:.4f}) ---")
+        print(f"Overall accuracy (All samples): {overall_accuracy:.4f}")
+        print(f"Coverage: {coverage:.4f} ({num_accepted} samples accepted)")
+        print(f"Rejection rate: {rejection_rate:.4f} ({num_rejected} samples rejected)")
+        print(f"Accuracy on accepted cases: {accuracy_accepted:.4f}")
+        print(f"Risk on accepted cases: {risk:.4f}")
 
-    # Chỉ số hiệu chỉnh (ECE - Expected Calibration Error)
+    # Calibration metric (ECE - Expected Calibration Error)
     ece = calculate_ece(model_predictions, rejection_scores, true_labels)
     if verbose:
         print(f"\nExpected Calibration Error (ECE): {ece:.4f}")
-        print(f"Negative Log-Likelihood (NLL) trên các mẫu được chấp nhận: {nll_accepted:.4f}")
-        print(f"Brier Score trên các mẫu được chấp nhận: {brier_accepted:.4f}")
+        print(f"Negative Log-Likelihood (NLL) on accepted samples: {nll_accepted:.4f}")
+        print(f"Brier Score on accepted samples: {brier_accepted:.4f}")
 
-    # AUROC và AUPR calculations
+    # AUROC and AUPR calculations
     is_correct = (model_predictions == true_labels).astype(int)
     
     if len(np.unique(true_labels)) > 1: 
         fpr, tpr, roc_thresholds = roc_curve(is_correct, rejection_scores)
         auroc = auc(fpr, tpr)
         if verbose:
-            print(f"AUROC (Điểm từ chối là điểm cho tính đúng đắn): {auroc:.4f}")
+            print(f"AUROC (Rejection score as score for correctness): {auroc:.4f}")
     else:
         auroc = np.nan
 
@@ -1587,7 +1459,7 @@ def calculate_metrics(model_predictions, rejection_scores, true_labels, rejectio
         precision_correct, recall_correct, _ = precision_recall_curve(is_correct, rejection_scores)
         aupr_correct = auc(recall_correct, precision_correct)
         if verbose:
-            print(f"AUPR (Điểm từ chối là điểm cho tính đúng đắn): {aupr_correct:.4f}")
+            print(f"AUPR (Rejection score as score for correctness): {aupr_correct:.4f}")
     else:
         aupr_correct = np.nan
 
@@ -1617,7 +1489,7 @@ def calculate_metrics(model_predictions, rejection_scores, true_labels, rejectio
     aurc = np.trapz(risks, coverages)
     
     if verbose:
-        print(f"Diện tích dưới Đường cong Risk-Coverage (AURC): {aurc:.4f}")
+        print(f"Area Under Risk-Coverage Curve (AURC): {aurc:.4f}")
 
     # ✅ FIXED: Added F1-Score calculation for rejection task
     # F1-Score for rejection task: ability to correctly identify rejected samples
@@ -1652,22 +1524,22 @@ def run_baseline(config_name, mcdo_enable, label_smoothing_enable,
                  combine_ood_with_disagreement=False,
                  enable_training_dynamics=False,):
     """
-    Chạy một cấu hình baseline cụ thể - Updated to match main.py structure.
+    Run a specific baseline configuration - Updated to match main.py structure.
     """
-    print(f"\\n{'='*20}\\nBắt đầu chạy Baseline: {config_name}\\n{'='*20}")
+    print(f"\\n{'='*20}\\nStarting Baseline: {config_name}\\n{'='*20}")
 
-    # Reset Config về trạng thái mặc định trước mỗi lần chạy
+    # Reset Config to default state before each run
     global cfg
     cfg = Config() 
     set_seed(cfg.RANDOM_SEED)
 
-    # Cấu hình các cờ cho baseline hiện tại
+    # Configure flags for current baseline
     cfg.MCDO_ENABLE = mcdo_enable
     cfg.LABEL_SMOOTHING_ENABLE = label_smoothing_enable
     cfg.ENABLE_TRAINING_DYNAMICS = enable_training_dynamics
 
-    # 3. Lấy Dự đoán Ensemble và Điểm Từ Chối (cho Tập Validation)
-    print(f"\\nLấy dự đoán và điểm từ chối cho Tập Validation (Sử dụng hiệu chỉnh: {calibration_method}, OOD: {ood_detection_method}, Kết hợp bất đồng: {combine_ood_with_disagreement})...")
+    # 3. Get Ensemble Predictions and Rejection Scores (for Validation Set)
+    print(f"\\nGetting predictions and rejection scores for Validation Set (Using calibration: {calibration_method}, OOD: {ood_detection_method}, Combine disagreement: {combine_ood_with_disagreement})...")
     val_model_predictions, val_rejection_scores, val_true_labels, val_original_indices, _, _, _ = (
         get_rejection_scores_and_predictions(cfg, val_loader, cfg.MODEL_SAVE_DIR, 
                                             final_overall_learning_metrics, train_dataset, 
@@ -1679,14 +1551,14 @@ def run_baseline(config_name, mcdo_enable, label_smoothing_enable,
     if cfg.DEVICE.type == 'cuda':
         torch.cuda.empty_cache()
 
-    # 4. Cơ chế Từ chối thích ứng: Tìm ngưỡng tối ưu trên Tập Validation
+    # 4. Adaptive Rejection Mechanism: Find optimal threshold on Validation Set
     best_rejection_threshold, _ = find_optimal_rejection_threshold(
         val_rejection_scores, val_model_predictions, val_true_labels, cfg
     )
-    print(f"Ngưỡng từ chối cuối cùng được chọn: {best_rejection_threshold:.4f}")
+    print(f"Final rejection threshold selected: {best_rejection_threshold:.4f}")
 
-    # 5. Đánh giá trên Tập Test bằng cách sử dụng ngưỡng đã học
-    print(f"\\n--- Đánh giá trên Tập Test (Sử dụng hiệu chỉnh: {calibration_method}, OOD: {ood_detection_method}, Kết hợp bất đồng: {combine_ood_with_disagreement}) ---")
+    # 5. Evaluate on Test Set using learned threshold
+    print(f"\\n--- Evaluation on Test Set (Using calibration: {calibration_method}, OOD: {ood_detection_method}, Combine disagreement: {combine_ood_with_disagreement}) ---")
     (test_model_predictions, test_rejection_scores, test_true_labels, test_original_indices,
      all_ensemble_individual_probs_test, test_odin_scores, test_energy_scores) = (
         get_rejection_scores_and_predictions(cfg, test_loader, cfg.MODEL_SAVE_DIR, 
@@ -1712,10 +1584,10 @@ def run_baseline(config_name, mcdo_enable, label_smoothing_enable,
 
 
     
-    print("\\n--- Tóm tắt Phân loại Trường hợp bị Từ chối ---")
-    print(f"Số lượng Trường hợp Từ chối Lỗi: {len(rejected_categories_info['failure_rejection_indices'])}")
-    print(f"Số lượng Trường hợp Từ chối Không rõ/Mơ hồ: {len(rejected_categories_info['unknown_ambiguous_indices'])}") 
-    print(f"Số lượng Trường hợp Từ chối OOD tiềm năng: {len(rejected_categories_info['potential_ood_indices'])}") 
+    print("\\n--- Summary of Rejected Case Classification ---")
+    print(f"Number of Failure Rejection Cases: {len(rejected_categories_info['failure_rejection_indices'])}")
+    print(f"Number of Unknown/Ambiguous Rejection Cases: {len(rejected_categories_info['unknown_ambiguous_indices'])}") 
+    print(f"Number of Potential OOD Rejection Cases: {len(rejected_categories_info['potential_ood_indices'])}") 
 
     return {
         'metrics': {
@@ -1746,10 +1618,10 @@ def categorize_rejected_cases(rejection_scores, model_predictions, true_labels, 
                              all_ensemble_individual_probs_stacked, all_odin_scores=None, all_energy_scores=None, 
                              ood_detection_method='none'):
     """
-    Phân loại các trường hợp bị từ chối.
-    - 'Failure Rejection': Các trường hợp bị từ chối do điểm từ chối thấp VÀ dự đoán của mô hình không chính xác.
-    - 'Potential OOD Rejected Cases': Các trường hợp bị từ chối do điểm từ chối thấp VÀ được xác định là OOD tiềm năng.
-    - 'Unknown/Ambiguous': Các trường hợp bị từ chối do điểm từ chối thấp, dự đoán đúng, và không được xác định là OOD tiềm năng.
+    Categorize rejected cases.
+    - 'Failure Rejection': Cases rejected due to low rejection score AND incorrect model prediction.
+    - 'Potential OOD Rejected Cases': Cases rejected due to low rejection score AND identified as potential OOD.
+    - 'Unknown/Ambiguous': Cases rejected due to low rejection score, correct prediction, and not identified as potential OOD.
     """
     rejected_mask = rejection_scores < rejection_threshold
     
@@ -1762,10 +1634,10 @@ def categorize_rejected_cases(rejection_scores, model_predictions, true_labels, 
     unknown_ambiguous_indices = [] 
     potential_ood_indices = [] 
     
-    # Tạo ánh xạ từ chỉ mục gốc (toàn cục) đến vị trí phẳng của nó trong mảng `original_indices`
+    # Create mapping from original (global) index to its flat position in the `original_indices` array
     original_to_flat_pos_map = {original_idx: flat_pos for flat_pos, original_idx in enumerate(original_indices)}
 
-    print(f"\\n--- Phân loại các Trường hợp bị Từ chối ({len(rejected_indices)} bị từ chối) ---")
+    print(f"\\n--- Categorizing Rejected Cases ({len(rejected_indices)} rejected) ---")
 
     # If energy scores are used for OOD classification, calculate the threshold now
     energy_ood_threshold = None
@@ -1779,7 +1651,7 @@ def categorize_rejected_cases(rejection_scores, model_predictions, true_labels, 
         current_rejection_score = rejected_rejection_scores[i_idx]
 
         if rejected_original_idx not in original_to_flat_pos_map:
-            print(f"Cảnh báo: Chỉ mục gốc {rejected_original_idx} không tìm thấy. Bỏ qua phân loại cho mẫu này.")
+            print(f"Warning: Original index {rejected_original_idx} not found. Skipping classification for this sample.")
             continue 
 
         flat_pos_in_full_data = original_to_flat_pos_map[rejected_original_idx]
@@ -1810,12 +1682,12 @@ def categorize_rejected_cases(rejection_scores, model_predictions, true_labels, 
                 if current_rejection_score < cfg.OOD_CONFIDENCE_THRESHOLD and variance_disagreement > cfg.OOD_VARIANCE_THRESHOLD:
                     is_potential_ood = True
 
-        # Phân loại
+        # Classification
         if current_pred != current_true:
             failure_rejection_indices.append(rejected_original_idx)
         elif is_potential_ood:
             potential_ood_indices.append(rejected_original_idx)
-        else: # Dự đoán đúng nhưng bị từ chối do sự không chắc chắn/bất đồng chung trong phân phối
+        else: # Correct prediction but rejected due to uncertainty/disagreement within distribution
             unknown_ambiguous_indices.append(rejected_original_idx)
 
     return {
@@ -1833,10 +1705,10 @@ def categorize_rejected_cases(rejection_scores, model_predictions, true_labels, 
 
 def plot_calibration_curve(model_predictions, rejection_scores, true_labels, num_bins=10, save_path=None):
     """
-    Vẽ biểu đồ độ tin cậy (Reliability Diagram) để đánh giá khả năng hiệu chỉnh.
+    Plot reliability diagram to evaluate calibration capability.
     """
     if len(rejection_scores) == 0:
-        print("Không có dữ liệu điểm để vẽ biểu đồ hiệu chỉnh.")
+        print("No score data to plot calibration chart.")
         return
 
     bins = np.linspace(0., 1., num_bins + 1)
@@ -2802,7 +2674,7 @@ if __name__ == "__main__":
             'config_name': 'Baseline B.2.1 - Ensemble + Energy Score (Basic)',
             'mcdo_enable': False,
             'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'energy', # Thay đổi thành 'energy'
+            'ood_detection_method': 'energy', # Change to 'energy'
             'combine_ood_with_disagreement': False,
             'enable_training_dynamics': False
         },
@@ -2810,7 +2682,7 @@ if __name__ == "__main__":
             'config_name': 'Baseline B.2.2 - Ensemble + Energy Score (Combined)',
             'mcdo_enable': False,
             'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'energy', # Thay đổi thành 'energy'
+            'ood_detection_method': 'energy', # Change to 'energy'
             'combine_ood_with_disagreement': True,
             'enable_training_dynamics': False
         },
@@ -2820,7 +2692,7 @@ if __name__ == "__main__":
             'calibration_method': 'temperature_scaling',
             'ood_detection_method': 'none',
             'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': True # Bật phân tích động lực huấn luyện
+            'enable_training_dynamics': True # Enable training dynamics analysis
         }
     ]
 
@@ -2851,9 +2723,9 @@ if __name__ == "__main__":
     frozen_ensemble_models = []
     for i in range(cfg.NUM_ENSEMBLE_MODELS):
         model = BaseClassifier(num_classes=2).to(cfg.DEVICE)
-        model.load_state_dict(torch.load(os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{i}.pth')))  # Tải trọng số tốt nhất
+        model.load_state_dict(torch.load(os.path.join(cfg.MODEL_SAVE_DIR, f'best_model_ensemble_{i}.pth')))  # Load best weights
         for param in model.parameters():
-            param.requires_grad = False  # Đóng băng mô hình
+            param.requires_grad = False  # Freeze model
         frozen_ensemble_models.append(model)
 
     print("\n--- Creating Feature Store and Training Dynamics ---")

@@ -89,9 +89,8 @@ Notes
 
 Dataset Download: Each command downloads the specified dataset from Kaggle using curl. Ensure a stable internet connection and proper Kaggle API credentials in your environment (e.g., ~/.kaggle/kaggle.json).
 Output: Results (metrics and visualizations) are saved in the xai_results directory within the working directory. Each dataset's output includes comparison metrics and risk-coverage plots, prefixed with the dataset name (e.g., comparison_metrics_covidqu_xray.png).
-Custom Datasets: Some datasets (intracranial_hemorrhage, head_ct_hemorrhage) use custom dataset classes (HemorrhagicDataset, HeadCTDataset). Ensure these are defined in your code.
+Custom Datasets: Some datasets (intracranial_hemorrhage, head_ct_hemorrhage) use custom dataset classes (HemorrhagicDataset, HeadCTDataset).
 Storage: Datasets can be large. Ensure sufficient disk space (at least 10-20 GB) in the working directory.
-Environment: The code uses the current working directory instead of /kaggle/working. If you encounter a Read-only file system error, verify that the working directory is writable.
 
 Troubleshooting
 
