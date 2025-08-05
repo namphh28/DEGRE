@@ -215,10 +215,10 @@ class Config:
 
         # Other settings
         self.RANDOM_SEED = 42
-        self.DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
         self.MODEL_SAVE_DIR = 'working/models' # Directory to save trained ensemble models
         os.makedirs(self.MODEL_SAVE_DIR, exist_ok=True)
-        self.XAI_SAVE_DIR = 'working/xai_visualizations' # Directory to save XAI visualizations
+        self.XAI_SAVE_DIR = 'working/charts' # Directory to save visualizations
         os.makedirs(self.XAI_SAVE_DIR, exist_ok=True) # Ensure XAI output directory exists
 
         self.ODIN_TEMPERATURE = 1000  # Temperature for ODIN
@@ -2566,6 +2566,314 @@ def calculate_metrics_1(preds, confs, labels, threshold):
     }
     return metrics
 
+def calculate_metrics_extended(preds, confs, labels, threshold, num_classes=2):
+    """
+    Calculates extended metrics including ECE, NLL, Brier Score, AUPR, AURC, and rejection case classification.
+    """
+    accepted_mask = confs >= threshold
+    rejected_mask = ~accepted_mask
+    
+    # Standard Metrics
+    overall_acc = accuracy_score(labels, preds)
+    coverage = accepted_mask.mean()
+    acc_accepted = accuracy_score(labels[accepted_mask], preds[accepted_mask]) if coverage > 0 else 0.0
+    risk_accepted = 1.0 - acc_accepted if coverage > 0 else 0.0
+    rejection_rate = 1.0 - coverage
+    
+    # Classification Metrics
+    is_correct = (preds == labels).astype(int)
+    is_rejected = rejected_mask.astype(int)
+    is_incorrect = (preds != labels).astype(int)
+    
+    fpr, tpr, _ = roc_curve(is_correct, confs)
+    auroc = auc(fpr, tpr)
+    precision, recall, _ = precision_recall_curve(is_correct, confs)
+    aupr = auc(recall, precision)
+    
+    # Calibration and Loss Metrics
+    ece = calculate_ece(preds[accepted_mask], confs[accepted_mask], labels[accepted_mask])
+    
+    # Convert predictions to one-hot for NLL and Brier Score
+    probs = np.zeros((len(preds), num_classes))
+    for i, p in enumerate(preds):
+        probs[i, p] = confs[i]
+        probs[i, 1 - p] = 1 - confs[i]  # Binary classification assumption
+    
+    nll_accepted = log_loss(labels[accepted_mask], probs[accepted_mask], labels=[0, 1]) if coverage > 0 else 0.0
+    brier_accepted = brier_score_loss(labels[accepted_mask], confs[accepted_mask]) if coverage > 0 else 0.0
+    
+    # AURC (Area Under Risk-Coverage Curve)
+    thresholds = np.sort(confs)[::-1]
+    risks, coverages = [], []
+    for t in thresholds:
+        mask = confs >= t
+        if mask.sum() > 0:
+            acc_t = accuracy_score(labels[mask], preds[mask])
+            risks.append(1.0 - acc_t)
+            coverages.append(mask.mean())
+        else:
+            risks.append(1.0)
+            coverages.append(0.0)
+    aurc = auc(np.array(coverages), np.array(risks))
+    
+    f1_rejection = f1_score(is_incorrect, is_rejected)
+    
+    metrics = {
+        'Overall Accuracy': overall_acc,
+        'Coverage': coverage,
+        'Rejection Rate': rejection_rate,
+        'Accuracy on Accepted': acc_accepted,
+        'Risk on Accepted': risk_accepted,
+        'ECE': ece,
+        'NLL on Accepted': nll_accepted,
+        'Brier Score on Accepted': brier_accepted,
+        'AUROC (Correctness)': auroc,
+        'AUPR (Correctness)': aupr,
+        'AURC': aurc,
+        'F1-Score (Rejection)': f1_rejection
+    }
+    return metrics, accepted_mask, rejected_mask
+
+# --- Classify Rejected Cases ---
+def classify_rejected_cases(preds, confs, labels, rejected_mask, threshold, entropy_threshold=0.5, ood_score_threshold=0.1):
+    """
+    Classifies rejected cases into Error, Ambiguous/Unclear, and Potential OOD.
+    - Error: Incorrect predictions.
+    - Ambiguous/Unclear: Correct predictions with high entropy (confidence < threshold).
+    - Potential OOD: Samples with low similarity to training data (placeholder logic).
+    """
+    num_rejected = rejected_mask.sum()
+    rejected_error = 0
+    rejected_ambiguous = 0
+    rejected_ood = 0
+    
+    for i in range(len(preds)):
+        if rejected_mask[i]:
+            is_correct = preds[i] == labels[i]
+            entropy = -np.sum([p * np.log(p + 1e-8) for p in [confs[i], 1 - confs[i]]])  # Binary entropy
+            if not is_correct:
+                rejected_error += 1
+            elif entropy > entropy_threshold:
+                rejected_ambiguous += 1
+            else:
+                rejected_ood += 1  # Placeholder: OOD detection requires additional features (e.g., similarity to training data)
+    
+    return {
+        'Rejected Error Cases': rejected_error,
+        'Rejected Ambiguous/Unclear Cases': rejected_ambiguous,
+        'Rejected Potential OOD Cases': rejected_ood
+    }
+
+def plot_all_risk_coverage_curves(all_results, save_dir):
+    """
+    Plots Risk-Coverage curves for all baselines on a single figure,
+    showing only coverage from 0.4 (40%) and above, using consistent colors
+    and highlighting 'Dynamic gating'.
+    
+    Args:
+        all_results (list): List of result dictionaries containing metrics and raw data.
+        save_dir (str): Directory to save the plot.
+    """
+    plt.figure(figsize=(10, 8))
+    
+    # Get default color cycle from matplotlib
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    for i, result in enumerate(all_results):
+        config_name = result['metrics']['Config Name']
+        rejection_scores = result['raw_data']['rejection_scores']
+        preds = result['raw_data']['predictions']
+        labels = result['raw_data']['true_labels']
+
+        num_total = len(labels)
+        if num_total == 0:
+            print(f"No data to plot Risk-Coverage curve for {config_name}.")
+            continue
+
+        # Sort samples by score in increasing order to simulate increasing rejection
+        sorted_indices = np.argsort(rejection_scores)
+        sorted_preds = preds[sorted_indices]
+        sorted_labels = labels[sorted_indices]
+
+        risks = []
+        coverages = []
+        for i_idx in range(num_total):
+            current_accepted_preds = sorted_preds[i_idx:]
+            current_accepted_labels = sorted_labels[i_idx:]
+            current_coverage = (num_total - i_idx) / num_total
+
+            if (num_total - i_idx) == 0:
+                current_risk = 1.0 
+            else:
+                num_correct = np.sum(current_accepted_preds == current_accepted_labels)
+                current_risk = 1.0 - (num_correct / (num_total - i_idx)) 
+
+            coverages.append(current_coverage)
+            risks.append(current_risk)
+
+        # Reverse lists so coverage goes from 0 to 1
+        coverages = np.array(coverages[::-1]) * 100 
+        risks = np.array(risks[::-1]) * 100       
+
+        # Filter to show only coverage >= 40%
+        mask = coverages >= 40
+        coverages = coverages[mask]
+        risks = risks[mask]
+
+        if len(coverages) == 0:
+            print(f"No data with coverage >= 40% for {config_name}.")
+            continue
+
+        # Highlight 'Dynamic gating' with red color and thicker line
+        if config_name == 'Dynamic_Gating':
+            plt.plot(coverages, risks, lw=3, color='blue', 
+                     label=f'{config_name}')
+        else:
+            plt.plot(coverages, risks, lw=2, color=colors[i % len(colors)], 
+                     label=f'{config_name}')
+
+    plt.xlabel("Coverage (%)")
+    plt.ylabel("Risk (%)")
+    plt.title("Risk-Coverage Curves for All Baselines")
+    plt.grid(True)
+    plt.legend(loc='upper right', bbox_to_anchor=(1, 1))
+    plt.xlim([80, 100])  # Adjusted to start from 40%
+    plt.ylim([0, 10])
+    plt.tight_layout()
+    
+    save_path = os.path.join(save_dir, 'all_risk_coverage_curves.png')
+    plt.savefig(save_path)
+    print(f"Saved Risk-Coverage curves to: {save_path}")
+    plt.show()
+    plt.close()
+
+def plot_all_calibration_curves(all_results, save_dir, num_bins=10):
+    """
+    Plots reliability diagrams for all baselines on a single figure,
+    showing only mean confidence scores from 0.8 and above, using consistent colors
+    and highlighting 'Dynamic gating'.
+    
+    Args:
+        all_results (list): List of result dictionaries containing metrics and raw data.
+        save_dir (str): Directory to save the plot.
+        num_bins (int): Number of bins for the reliability diagram. Default is 10.
+    """
+    plt.figure(figsize=(10, 10))
+    plt.plot([0.8, 1], [0.8, 1], linestyle='--', color='gray', label='Perfect Calibration')
+
+    # Get default color cycle from matplotlib
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    for i, result in enumerate(all_results):
+        try:
+            config_name = result['metrics']['Config Name']
+            preds = result['raw_data']['predictions']
+            rejection_scores = result['raw_data']['rejection_scores']
+            labels = result['raw_data']['true_labels']
+        except KeyError as e:
+            print(f"Error: Key {e} not found in result for baseline.")
+            continue
+
+        if not all(isinstance(arr, np.ndarray) for arr in [preds, rejection_scores, labels]):
+            print(f"Error: Input data for {config_name} must be np.ndarray.")
+            continue
+
+        if len(rejection_scores) == 0:
+            print(f"No reliability data to plot reliability diagram for {config_name}.")
+            continue
+
+        bins = np.linspace(0., 1., num_bins + 1)
+        bin_accuracies = []
+        bin_rejection_scores = []
+
+        for j in range(num_bins):
+            lower_bound = bins[j]
+            upper_bound = bins[j + 1]
+            mask = (rejection_scores >= lower_bound) & (rejection_scores < upper_bound)
+            if j == num_bins - 1:
+                mask = (rejection_scores >= lower_bound) & (rejection_scores <= upper_bound)
+
+            bin_indices = np.where(mask)[0]
+            if len(bin_indices) > 0:
+                bin_accuracy = accuracy_score(labels[bin_indices], preds[bin_indices])
+                bin_rejection_score_mean = np.mean(rejection_scores[bin_indices])
+                bin_accuracies.append(bin_accuracy)
+                bin_rejection_scores.append(bin_rejection_score_mean)
+            else:
+                bin_accuracies.append(np.nan)
+                bin_rejection_scores.append(np.nan)
+
+        # Convert to numpy arrays for filtering
+        bin_accuracies = np.array(bin_accuracies)
+        bin_rejection_scores = np.array(bin_rejection_scores)
+
+        # Filter to show only mean confidence scores >= 0.8, avoiding NaN comparison
+        valid_bins_mask = ~np.isnan(bin_accuracies)
+        valid_scores = bin_rejection_scores[valid_bins_mask]
+        valid_bins_mask[valid_bins_mask] &= valid_scores >= 0.5
+        bin_accuracies = bin_accuracies[valid_bins_mask]
+        bin_rejection_scores = bin_rejection_scores[valid_bins_mask]
+
+        if len(bin_accuracies) == 0:
+            print(f"No data with mean confidence score >= 0.8 for {config_name}.")
+            continue
+
+        # Highlight 'Dynamic gating' with red color, thicker line, and larger markers
+        if config_name == 'Dynamic_Gating':
+            plt.plot(bin_rejection_scores, bin_accuracies, marker='o', linestyle='-', 
+                     color='blue', linewidth=3, markersize=8, label=f'{config_name}')
+        else:
+            plt.plot(bin_rejection_scores, bin_accuracies, marker='o', linestyle='-', 
+                     color=colors[i % len(colors)], linewidth=2, markersize=6, label=f'{config_name}')
+
+    plt.xlabel("Mean Confidence Score")
+    plt.ylabel("Accuracy")
+    plt.title("Reliability Diagrams for All Baselines")
+    plt.grid(True)
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    plt.xlim([0.8, 1])
+    plt.ylim([0.4, 1])
+    plt.tight_layout()
+    
+    save_path = os.path.join(save_dir, 'all_reliability_diagrams.png')
+    plt.savefig(save_path, bbox_inches='tight')
+    print(f"Saved Reliability Diagrams to: {save_path}")
+    plt.show()
+    plt.close()
+
+def save_metrics_to_csv(all_baseline_results, save_dir):
+    """
+    Save metrics from all_baseline_results to a CSV file.
+
+    Parameters:
+    - all_baseline_results: List of dictionaries containing metrics for each baseline.
+    - save_dir: Directory to save the CSV file (e.g., cfg.XAI_SAVE_DIR).
+    - dataset_name: Name of the dataset (default: 'covidqu_xray').
+    """
+    # Define the columns for the CSV based on result['metrics']
+    columns = [
+        "Config Name", "Overall Accuracy", "Accuracy on Accepted", "Coverage", 
+        "Rejection Rate", "Risk", "ECE", "NLL Accepted", "Brier Accepted", 
+        "AUROC", "AUPR", "AURC", "F1 Rejection", "Failure Rejected Count", 
+        "Unknown/Ambiguous Rejected Count", "Potential OOD Rejected Count"
+    ]
+
+    # Prepare data for CSV
+    data = []
+    for result in all_baseline_results:
+        metrics = result['metrics']
+        row = {col: metrics.get(col, "N/A") for col in columns}
+        data.append(row)
+
+    # Create DataFrame
+    df = pd.DataFrame(data, columns=columns)
+
+    # Create output file path
+    output_file = os.path.join(save_dir, f"comparison_metrics_ouputs.csv")
+
+    # Save to CSV
+    df.to_csv(output_file, index=False)
+    print(f"Saved metrics to {output_file}")
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run selective classification on medical imaging datasets.')
@@ -2630,70 +2938,70 @@ if __name__ == "__main__":
             'combine_ood_with_disagreement': False,
             'enable_training_dynamics': False
         },
-        {
-            'config_name': 'Baseline A.1 - Ensemble + MCDO',
-            'mcdo_enable': True, # Bật MCDO cho suy luận
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'none',
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline A.2.1 - Isotonic Regression',
-            'mcdo_enable': False,
-            'calibration_method': 'isotonic_regression',
-            'ood_detection_method': 'none',
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline A.2.2 - Beta Calibration',
-            'mcdo_enable': False,
-            'calibration_method': 'beta_calibration',
-            'ood_detection_method': 'none',
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline B.1.1 - Ensemble + ODIN (Basic)',
-            'mcdo_enable': False,
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'odin',
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline B.1.2 - Ensemble + ODIN (Combined)',
-            'mcdo_enable': False,
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'odin',
-            'combine_ood_with_disagreement': True,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline B.2.1 - Ensemble + Energy Score (Basic)',
-            'mcdo_enable': False,
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'energy', # Change to 'energy'
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline B.2.2 - Ensemble + Energy Score (Combined)',
-            'mcdo_enable': False,
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'energy', # Change to 'energy'
-            'combine_ood_with_disagreement': True,
-            'enable_training_dynamics': False
-        },
-        {
-            'config_name': 'Baseline B.3 - Ensemble + Training Dynamics Insights',
-            'mcdo_enable': False,
-            'calibration_method': 'temperature_scaling',
-            'ood_detection_method': 'none',
-            'combine_ood_with_disagreement': False,
-            'enable_training_dynamics': True # Enable training dynamics analysis
-        }
+        # {
+        #     'config_name': 'Baseline A.1 - Ensemble + MCDO',
+        #     'mcdo_enable': True, # Bật MCDO cho suy luận
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'none',
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline A.2.1 - Isotonic Regression',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'isotonic_regression',
+        #     'ood_detection_method': 'none',
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline A.2.2 - Beta Calibration',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'beta_calibration',
+        #     'ood_detection_method': 'none',
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline B.1.1 - Ensemble + ODIN (Basic)',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'odin',
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline B.1.2 - Ensemble + ODIN (Combined)',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'odin',
+        #     'combine_ood_with_disagreement': True,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline B.2.1 - Ensemble + Energy Score (Basic)',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'energy', # Change to 'energy'
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline B.2.2 - Ensemble + Energy Score (Combined)',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'energy', # Change to 'energy'
+        #     'combine_ood_with_disagreement': True,
+        #     'enable_training_dynamics': False
+        # },
+        # {
+        #     'config_name': 'Baseline B.3 - Ensemble + Training Dynamics Insights',
+        #     'mcdo_enable': False,
+        #     'calibration_method': 'temperature_scaling',
+        #     'ood_detection_method': 'none',
+        #     'combine_ood_with_disagreement': False,
+        #     'enable_training_dynamics': True # Enable training dynamics analysis
+        # }
     ]
 
     for idx, baseline_config in enumerate(baselines_to_run):
@@ -2772,3 +3080,72 @@ if __name__ == "__main__":
         print(f"{metric}: {value:.4f}")
 
     print("\n--- FULL PIPELINE COMPLETED ---")
+
+    # --- Main Evaluation Flow ---
+    print("\n--- Evaluating System with Extended Metrics ---")
+
+    # Fixed threshold from evaluation results
+    fixed_threshold = best_threshold
+
+    # Calculate extended metrics
+    metrics, accepted_mask, rejected_mask = calculate_metrics_extended(test_preds, test_confs, test_labels, fixed_threshold)
+
+    # Classify rejected cases
+    rejection_summary = classify_rejected_cases(test_preds, test_confs, test_labels, rejected_mask, fixed_threshold)
+
+    # Display Results
+    print(f"\n--- Evaluation Results (Threshold={fixed_threshold:.4f}) ---")
+    print(f"Overall Accuracy (All Samples): {metrics['Overall Accuracy']:.4f}")
+    print(f"Coverage: {metrics['Coverage']:.4f} ({int(metrics['Coverage'] * len(test_labels))} samples accepted)")
+    print(f"Rejection Rate: {metrics['Rejection Rate']:.4f} ({int(metrics['Rejection Rate'] * len(test_labels))} samples rejected)")
+    print(f"Accuracy on Accepted Cases: {metrics['Accuracy on Accepted']:.4f}")
+    print(f"Risk on Accepted Cases: {metrics['Risk on Accepted']:.4f}")
+    print(f"Expected Calibration Error (ECE): {metrics['ECE']:.4f}")
+    print(f"Negative Log-Likelihood (NLL) on Accepted Samples: {metrics['NLL on Accepted']:.4f}")
+    print(f"Brier Score on Accepted Samples: {metrics['Brier Score on Accepted']:.4f}")
+    print(f"AUROC (Rejection Score as Correctness Score): {metrics['AUROC (Correctness)']:.4f}")
+    print(f"AUPR (Rejection Score as Correctness Score): {metrics['AUPR (Correctness)']:.4f}")
+    print(f"Area Under Risk-Coverage Curve (AURC): {metrics['AURC']:.4f}")
+    print(f"F1-Score (Rejection Task - Identifying Incorrect Predictions): {metrics['F1-Score (Rejection)']:.4f}")
+
+    print(f"\n--- Classification of Rejected Cases ({rejection_summary['Rejected Error Cases'] + rejection_summary['Rejected Ambiguous/Unclear Cases'] + rejection_summary['Rejected Potential OOD Cases']} rejected) ---")
+    print(f"\n--- Rejected Cases Classification Summary ---")
+    print(f"Number of Rejected Error Cases: {rejection_summary['Rejected Error Cases']}")
+    print(f"Number of Rejected Ambiguous/Unclear Cases: {rejection_summary['Rejected Ambiguous/Unclear Cases']}")
+    print(f"Number of Rejected Potential OOD Cases: {rejection_summary['Rejected Potential OOD Cases']}")
+
+    config_name = "Dynamic_Gating"
+
+    result = {
+        'metrics': {
+            'Config Name': config_name,
+            'Overall Accuracy': metrics['Overall Accuracy'],
+            'Accuracy on Accepted': metrics['Accuracy on Accepted'],
+            'Coverage': metrics['Coverage'],
+            'Rejection Rate': metrics['Rejection Rate'],
+            'Risk': metrics['Risk on Accepted'],
+            'ECE': metrics['ECE'],
+            'NLL Accepted': metrics['NLL on Accepted'],
+            'Brier Accepted': metrics['Brier Score on Accepted'],
+            'AUROC': metrics['AUROC (Correctness)'],
+            'AUPR': metrics['AUPR (Correctness)'],
+            'AURC': metrics['AURC'],
+            'F1 Rejection': metrics['F1-Score (Rejection)'],
+            'Failure Rejected Count': rejection_summary['Rejected Error Cases'],
+            'Unknown/Ambiguous Rejected Count': rejection_summary['Rejected Ambiguous/Unclear Cases'],
+            'Potential OOD Rejected Count': rejection_summary['Rejected Potential OOD Cases']
+        },
+        'raw_data': {
+            'predictions': test_preds,
+            'rejection_scores': test_confs,
+            'true_labels': test_labels
+        }
+    }
+    
+    all_baseline_results.append(result)
+
+    plot_all_risk_coverage_curves(all_baseline_results, cfg.XAI_SAVE_DIR)
+    plot_all_calibration_curves(all_baseline_results, cfg.XAI_SAVE_DIR)
+
+    save_metrics_to_csv(all_baseline_results, cfg.XAI_SAVE_DIR)
+
